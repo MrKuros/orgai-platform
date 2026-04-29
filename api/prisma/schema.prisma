@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  memberships Membership[]
+  roles       Role[]
+  policies    Policy[]
+  apiKeys     ApiKey[]
+  auditLogs   AuditLog[]
+  webhooks    Webhook[]
+  ssoConfig   SsoConfig?
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String?
+  firstName     String?
+  lastName      String?
+  workosUserId  String?  @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  memberships   Membership[]
+  apiKeys       ApiKey[]
+  auditLogs     AuditLog[]
+}
+
+model Membership {
+  id             String           @id @default(uuid())
+  orgId          String
+  userId         String
+  role           MembershipRole   @default(MEMBER)
+  assignedRoleId String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  org            Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedRole   Role?            @relation(fields: [assignedRoleId], references: [id])
+
+  @@unique([orgId, userId])
+}
+
+enum MembershipRole {
+  ORG_ADMIN
+  POLICY_ADMIN
+  MEMBER
+}
+
+model Role {
+  id            String         @id @default(uuid())
+  orgId         String
+  name          String
+  displayName   String
+  inheritsFromId String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  org           Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  inheritsFrom  Role?          @relation("RoleInheritance", fields: [inheritsFromId], references: [id])
+  children      Role[]         @relation("RoleInheritance")
+  bindings      PolicyBinding[]
+  memberships   Membership[]
+
+  @@unique([orgId, name])
+}
+
+model Policy {
+  id             String         @id @default(uuid())
+  orgId          String
+  name           String
+  rule           String
+  skill          String         @default("")
+  evaluatorType  String         @default("none")
+  evaluatorPattern String?
+  evaluatorFlags String?
+  fixSuggestion  String         @default("")
+  severity       PolicySeverity @default(ERROR)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  org            Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  bindings       PolicyBinding[]
+}
+
+enum PolicySeverity {
+  ERROR
+  WARNING
+}
+
+model PolicyBinding {
+  id         String   @id @default(uuid())
+  roleId     String
+  policyId   String
+  createdAt  DateTime @default(now())
+
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  policy     Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, policyId])
+}
+
+model ApiKey {
+  id          String       @id @default(uuid())
+  orgId       String
+  createdById String
+  name        String
+  keyHash     String       @unique
+  keyPrefix   String
+  scopes      String[]
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime     @default(now())
+
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy   User         @relation(fields: [createdById], references: [id])
+}
+
+model AuditLog {
+  id         String       @id @default(uuid())
+  orgId      String
+  actorId    String?
+  action     String
+  resource   String?
+  metadata   Json?
+  createdAt  DateTime     @default(now())
+
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  actor      User?        @relation(fields: [actorId], references: [id])
+}
+
+model Webhook {
+  id         String       @id @default(uuid())
+  orgId      String
+  url        String
+  secret     String
+  events     String[]
+  active     Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}
+
+model SsoConfig {
+  id             String       @id @default(uuid())
+  orgId          String       @unique
+  provider       String
+  workosOrgId    String?
+  connectionId   String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  org            Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}

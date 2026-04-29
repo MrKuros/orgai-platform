@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OrgAI Platform Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="login-container" class="container active">
+        <div class="glass-card login-card">
+            <div class="logo">OrgAI</div>
+            <h2>Welcome Back</h2>
+            <p>Sign in to your compliance platform</p>
+            <form id="login-form">
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="email" value="admin@acme.com" required>
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="password" value="password123" required>
+                </div>
+                <button type="submit" class="btn primary-btn" id="login-btn">
+                    <span>Sign In</span>
+                    <div class="spinner" id="login-spinner"></div>
+                </button>
+                <div id="login-error" class="error-msg"></div>
+            </form>
+        </div>
+    </div>
+
+    <div id="dashboard-container" class="container">
+        <aside class="sidebar glass-card">
+            <div class="logo">OrgAI</div>
+            <div class="org-info">
+                <div class="org-avatar" id="org-avatar">A</div>
+                <div class="org-details">
+                    <span id="org-name">Acme Corp</span>
+                    <span id="user-role" class="badge">ORG_ADMIN</span>
+                </div>
+            </div>
+            <nav>
+                <a href="#" class="nav-item active">Dashboard</a>
+                <a href="#" class="nav-item">Policies</a>
+                <a href="#" class="nav-item">Members</a>
+                <a href="#" class="nav-item" id="logout-btn">Sign Out</a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header>
+                <h1>Compliance Sandbox</h1>
+                <p>Test your policies in real-time against the agent checker.</p>
+            </header>
+
+            <div class="dashboard-grid">
+                <!-- Policies List -->
+                <div class="glass-card policies-card">
+                    <div class="card-header">
+                        <h3>Active Policies</h3>
+                        <span class="badge count-badge" id="policy-count">0</span>
+                    </div>
+                    <div class="policy-list" id="policy-list">
+                        <div class="spinner-container"><div class="spinner"></div></div>
+                    </div>
+                </div>
+
+                <!-- Sandbox -->
+                <div class="glass-card sandbox-card">
+                    <div class="card-header">
+                        <h3>Agent Sandbox</h3>
+                        <div class="role-selector">
+                            <label>Context Role:</label>
+                            <select id="sandbox-role">
+                                <option value="junior">Junior Developer</option>
+                                <option value="senior">Senior Developer</option>
+                                <option value="lead">Lead Developer</option>
+                                <option value="cto">CTO</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="editor-container">
+                        <textarea id="code-editor" spellcheck="false" placeholder="// Write or paste code here...&#10;&#10;const secret = 'sk-1234567890';&#10;console.log(secret);"></textarea>
+                    </div>
+                    <div class="sandbox-actions">
+                        <button class="btn primary-btn" id="check-code-btn">
+                            <span>Run Check</span>
+                            <div class="spinner" id="check-spinner"></div>
+                        </button>
+                    </div>
+                    <div class="results-container" id="results-container">
+                        <!-- Results injected here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
