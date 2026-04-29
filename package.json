@@ -1,0 +1,8 @@
+{
+  "name": "orgai-platform",
+  "private": true,
+  "workspaces": [
+    "api",
+    "dashboard"
+  ]
+}
