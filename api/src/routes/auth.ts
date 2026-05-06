@@ -6,7 +6,7 @@ import rateLimit from 'express-rate-limit';
 import { validate } from '../middleware/validate';
 import { prisma } from '../lib/prisma';
 import { signToken } from '../lib/jwt';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireApiKey } from '../middleware/auth';
 import { writeAuditLog } from '../services/audit';
 
 export const authRouter = Router();
@@ -63,12 +63,17 @@ authRouter.post('/signup', authLimiter, validate(signupSchema), async (req, res)
     metadata: { orgName, orgSlug }
   });
 
+  const fullUser = await prisma.user.findUnique({
+    where: { id: result.user.id },
+    include: { memberships: { include: { org: true } } }
+  });
+
   const token = signToken({ userId: result.user.id, email: result.user.email });
   
   res.cookie('orgai_session', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
   res.status(201).json({
     token,
-    user: { id: result.user.id, email: result.user.email, firstName, lastName },
+    user: fullUser,
     org: { id: result.org.id, name: result.org.name, slug: result.org.slug }
   });
 });
@@ -195,4 +200,17 @@ authRouter.get('/me', requireAuth, async (req, res) => {
 
   const { passwordHash, ...safeUser } = userWithMemberships;
   res.json({ user: safeUser });
+});
+
+// GET /v1/me/api  — API key identity lookup (for MCP / machine clients)
+authRouter.get('/me/api', requireApiKey, (req, res) => {
+  const org = req.org!;
+  const key = req.apiKeyRecord!;
+  res.json({
+    orgId:    org.id,
+    orgName:  org.name,
+    orgSlug:  org.slug,
+    keyName:  key.name,
+    scopes:   key.scopes,
+  });
 });

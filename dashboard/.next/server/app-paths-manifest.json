@@ -1,7 +1,8 @@
 {
-  "/dashboard/page": "app/dashboard/page.js",
   "/roles/page": "app/roles/page.js",
   "/policies/page": "app/policies/page.js",
+  "/team/page": "app/team/page.js",
   "/settings/api-keys/page": "app/settings/api-keys/page.js",
-  "/team/page": "app/team/page.js"
+  "/dashboard/page": "app/dashboard/page.js",
+  "/(auth)/login/page": "app/(auth)/login/page.js"
 }

@@ -1,0 +1,85 @@
+src/api-client.ts(35,5): error TS2322: Type 'unknown' is not assignable to type '{ orgId: string; orgName: string; orgSlug: string; keyName: string; scopes: string[]; } | null'.
+src/tools.ts(4,41): error TS7016: Could not find a declaration file for module '@comply/core'. '/home/alien/code/orgai-platform/packages/core/dist/index.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/comply__core` if it exists or add a new declaration (.d.ts) file containing `declare module '@comply/core';`
+src/tools.ts(28,3): error TS2589: Type instantiation is excessively deep and possibly infinite.
+src/tools.ts(28,10): error TS2769: No overload matches this call.
+  Overload 1 of 6, '(name: string, description: string, paramsSchemaOrAnnotations: ZodRawShapeCompat | { title?: string | undefined; readOnlyHint?: boolean | undefined; destructiveHint?: boolean | undefined; idempotentHint?: boolean | undefined; openWorldHint?: boolean | undefined; }, cb: (args: ShapeOutput<...>, extra: RequestHandlerExtra<...>) => { ...; } | Promise<...>): RegisteredTool', gave the following error.
+    Argument of type '{ code: z.ZodString; filePath: z.ZodString; userRole: z.ZodOptional<z.ZodString>; policyUrl: z.ZodOptional<z.ZodString>; authHeader: z.ZodOptional<z.ZodString>; }' is not assignable to parameter of type 'ZodRawShapeCompat | { title?: string | undefined; readOnlyHint?: boolean | undefined; destructiveHint?: boolean | undefined; idempotentHint?: boolean | undefined; openWorldHint?: boolean | undefined; }'.
+      Type '{ code: z.ZodString; filePath: z.ZodString; userRole: z.ZodOptional<z.ZodString>; policyUrl: z.ZodOptional<z.ZodString>; authHeader: z.ZodOptional<z.ZodString>; }' is not assignable to type 'ZodRawShapeCompat'.
+        Property 'userRole' is incompatible with index signature.
+          Type 'ZodOptional<ZodString>' is not assignable to type 'AnySchema'.
+            Type 'ZodOptional<ZodString>' is not assignable to type 'ZodTypeAny'.
+              The types returned by 'refine(...)' are incompatible between these types.
+                Type 'ZodEffects<ZodOptional<ZodString>, any, string | undefined>' is missing the following properties from type 'ZodEffects<ZodType<any, any, any>, any, any>': _type, _output, _input, _def, and 33 more.
+  Overload 2 of 6, '(name: string, paramsSchema: ZodRawShapeCompat, annotations: { title?: string | undefined; readOnlyHint?: boolean | undefined; destructiveHint?: boolean | undefined; idempotentHint?: boolean | undefined; openWorldHint?: boolean | undefined; }, cb: (args: ShapeOutput<...>, extra: RequestHandlerExtra<...>) => { ...; } | Promise<...>): RegisteredTool', gave the following error.
+    Argument of type 'string' is not assignable to parameter of type 'ZodRawShapeCompat'.
+src/tools.ts(37,40): error TS18046: 'orgInfo' is of type 'unknown'.
+src/tools.ts(44,26): error TS18046: 'res' is of type 'unknown'.
+src/tools.ts(45,26): error TS18046: 'res' is of type 'unknown'.
+src/tools.ts(48,13): error TS18046: 'res' is of type 'unknown'.
+src/tools.ts(55,44): error TS18046: 'res' is of type 'unknown'.
+src/tools.ts(55,68): error TS18046: 'res' is of type 'unknown'.
+src/tools.ts(67,42): error TS7006: Parameter 'v' implicitly has an 'any' type.
+src/tools.ts(68,42): error TS7006: Parameter 'v' implicitly has an 'any' type.
+src/tools.ts(92,10): error TS2769: No overload matches this call.
+  Overload 1 of 6, '(name: string, description: string, paramsSchemaOrAnnotations: ZodRawShapeCompat | { title?: string | undefined; readOnlyHint?: boolean | undefined; destructiveHint?: boolean | undefined; idempotentHint?: boolean | undefined; openWorldHint?: boolean | undefined; }, cb: (args: ShapeOutput<...>, extra: RequestHandlerExtra<...>) => { ...; } | Promise<...>): RegisteredTool', gave the following error.
+    Argument of type '{ command: z.ZodString; userRole: z.ZodOptional<z.ZodString>; policyUrl: z.ZodOptional<z.ZodString>; authHeader: z.ZodOptional<z.ZodString>; }' is not assignable to parameter of type 'ZodRawShapeCompat | { title?: string | undefined; readOnlyHint?: boolean | undefined; destructiveHint?: boolean | undefined; idempotentHint?: boolean | undefined; openWorldHint?: boolean | undefined; }'.
+      Type '{ command: z.ZodString; userRole: z.ZodOptional<z.ZodString>; policyUrl: z.ZodOptional<z.ZodString>; authHeader: z.ZodOptional<z.ZodString>; }' is not assignable to type 'ZodRawShapeCompat'.
+        Property 'userRole' is incompatible with index signature.
+          Type 'ZodOptional<ZodString>' is not assignable to type 'AnySchema'.
+            Type 'ZodOptional<ZodString>' is not assignable to type 'ZodTypeAny'.
+              The types returned by 'refine(...)' are incompatible between these types.
+                Type 'ZodEffects<ZodOptional<ZodString>, any, string | undefined>' is missing the following properties from type 'ZodEffects<ZodType<any, any, any>, any, any>': _type, _output, _input, _def, and 33 more.
+  Overload 2 of 6, '(name: string, paramsSchema: ZodRawShapeCompat, annotations: { title?: string | undefined; readOnlyHint?: boolean | undefined; destructiveHint?: boolean | undefined; idempotentHint?: boolean | undefined; openWorldHint?: boolean | undefined; }, cb: (args: ShapeOutput<...>, extra: RequestHandlerExtra<...>) => { ...; } | Promise<...>): RegisteredTool', gave the following error.
+    Argument of type 'string' is not assignable to parameter of type 'ZodRawShapeCompat'.
+src/tools.ts(101,40): error TS18046: 'orgInfo' is of type 'unknown'.
+src/tools.ts(107,26): error TS18046: 'res' is of type 'unknown'.
+src/tools.ts(108,26): error TS18046: 'res' is of type 'unknown'.
+src/tools.ts(111,13): error TS18046: 'res' is of type 'unknown'.
+src/tools.ts(118,44): error TS18046: 'res' is of type 'unknown'.
+src/tools.ts(118,68): error TS18046: 'res' is of type 'unknown'.
+src/tools.ts(130,42): error TS7006: Parameter 'v' implicitly has an 'any' type.
+src/tools.ts(131,42): error TS7006: Parameter 'v' implicitly has an 'any' type.
+src/tools.ts(154,10): error TS2769: No overload matches this call.
+  Overload 1 of 6, '(name: string, description: string, paramsSchemaOrAnnotations: ZodRawShapeCompat | { title?: string | undefined; readOnlyHint?: boolean | undefined; destructiveHint?: boolean | undefined; idempotentHint?: boolean | undefined; openWorldHint?: boolean | undefined; }, cb: (args: ShapeOutput<...>, extra: RequestHandlerExtra<...>) => { ...; } | Promise<...>): RegisteredTool', gave the following error.
+    Argument of type '{ userRole: z.ZodOptional<z.ZodString>; policyUrl: z.ZodOptional<z.ZodString>; authHeader: z.ZodOptional<z.ZodString>; }' is not assignable to parameter of type 'ZodRawShapeCompat | { title?: string | undefined; readOnlyHint?: boolean | undefined; destructiveHint?: boolean | undefined; idempotentHint?: boolean | undefined; openWorldHint?: boolean | undefined; }'.
+      Type '{ userRole: z.ZodOptional<z.ZodString>; policyUrl: z.ZodOptional<z.ZodString>; authHeader: z.ZodOptional<z.ZodString>; }' is not assignable to type 'ZodRawShapeCompat'.
+        Property 'userRole' is incompatible with index signature.
+          Type 'ZodOptional<ZodString>' is not assignable to type 'AnySchema'.
+            Type 'ZodOptional<ZodString>' is not assignable to type 'ZodTypeAny'.
+              The types returned by 'refine(...)' are incompatible between these types.
+                Type 'ZodEffects<ZodOptional<ZodString>, any, string | undefined>' is missing the following properties from type 'ZodEffects<ZodType<any, any, any>, any, any>': _type, _output, _input, _def, and 33 more.
+  Overload 2 of 6, '(name: string, paramsSchema: ZodRawShapeCompat, annotations: { title?: string | undefined; readOnlyHint?: boolean | undefined; destructiveHint?: boolean | undefined; idempotentHint?: boolean | undefined; openWorldHint?: boolean | undefined; }, cb: (args: ShapeOutput<...>, extra: RequestHandlerExtra<...>) => { ...; } | Promise<...>): RegisteredTool', gave the following error.
+    Argument of type 'string' is not assignable to parameter of type 'ZodRawShapeCompat'.
+src/tools.ts(163,46): error TS18046: 'orgInfo' is of type 'unknown'.
+src/tools.ts(168,21): error TS18046: 'res' is of type 'unknown'.
+src/tools.ts(169,28): error TS18046: 'res' is of type 'unknown'.
+src/tools.ts(170,25): error TS18046: 'res' is of type 'unknown'.
+src/tools.ts(171,29): error TS18046: 'res' is of type 'unknown'.
+src/tools.ts(202,10): error TS2769: No overload matches this call.
+  Overload 1 of 6, '(name: string, description: string, paramsSchemaOrAnnotations: ZodRawShapeCompat | { title?: string | undefined; readOnlyHint?: boolean | undefined; destructiveHint?: boolean | undefined; idempotentHint?: boolean | undefined; openWorldHint?: boolean | undefined; }, cb: (args: ShapeOutput<...>, extra: RequestHandlerExtra<...>) => { ...; } | Promise<...>): RegisteredTool', gave the following error.
+    Argument of type '{ diff: z.ZodString; userRole: z.ZodOptional<z.ZodString>; policyUrl: z.ZodOptional<z.ZodString>; authHeader: z.ZodOptional<z.ZodString>; }' is not assignable to parameter of type 'ZodRawShapeCompat | { title?: string | undefined; readOnlyHint?: boolean | undefined; destructiveHint?: boolean | undefined; idempotentHint?: boolean | undefined; openWorldHint?: boolean | undefined; }'.
+      Type '{ diff: z.ZodString; userRole: z.ZodOptional<z.ZodString>; policyUrl: z.ZodOptional<z.ZodString>; authHeader: z.ZodOptional<z.ZodString>; }' is not assignable to type 'ZodRawShapeCompat'.
+        Property 'userRole' is incompatible with index signature.
+          Type 'ZodOptional<ZodString>' is not assignable to type 'AnySchema'.
+            Type 'ZodOptional<ZodString>' is not assignable to type 'ZodTypeAny'.
+              The types returned by 'refine(...)' are incompatible between these types.
+                Type 'ZodEffects<ZodOptional<ZodString>, any, string | undefined>' is missing the following properties from type 'ZodEffects<ZodType<any, any, any>, any, any>': _type, _output, _input, _def, and 33 more.
+  Overload 2 of 6, '(name: string, paramsSchema: ZodRawShapeCompat, annotations: { title?: string | undefined; readOnlyHint?: boolean | undefined; destructiveHint?: boolean | undefined; idempotentHint?: boolean | undefined; openWorldHint?: boolean | undefined; }, cb: (args: ShapeOutput<...>, extra: RequestHandlerExtra<...>) => { ...; } | Promise<...>): RegisteredTool', gave the following error.
+    Argument of type 'string' is not assignable to parameter of type 'ZodRawShapeCompat'.
+src/tools.ts(214,17): error TS18046: 'orgInfo' is of type 'unknown'.
+src/tools.ts(238,26): error TS18046: 'res' is of type 'unknown'.
+src/tools.ts(265,28): error TS18046: 'res' is of type 'unknown'.
+src/tools.ts(304,42): error TS18046: 'orgInfo' is of type 'unknown'.
+src/tools.ts(320,10): error TS2769: No overload matches this call.
+  Overload 1 of 6, '(name: string, description: string, paramsSchemaOrAnnotations: ZodRawShapeCompat | { title?: string | undefined; readOnlyHint?: boolean | undefined; destructiveHint?: boolean | undefined; idempotentHint?: boolean | undefined; openWorldHint?: boolean | undefined; }, cb: (args: ShapeOutput<...>, extra: RequestHandlerExtra<...>) => { ...; } | Promise<...>): RegisteredTool', gave the following error.
+    Argument of type '{ action: z.ZodOptional<z.ZodString>; limit: z.ZodOptional<z.ZodNumber>; }' is not assignable to parameter of type 'ZodRawShapeCompat | { title?: string | undefined; readOnlyHint?: boolean | undefined; destructiveHint?: boolean | undefined; idempotentHint?: boolean | undefined; openWorldHint?: boolean | undefined; }'.
+      Type '{ action: z.ZodOptional<z.ZodString>; limit: z.ZodOptional<z.ZodNumber>; }' is not assignable to type 'ZodRawShapeCompat'.
+        Property 'action' is incompatible with index signature.
+          Type 'ZodOptional<ZodString>' is not assignable to type 'AnySchema'.
+            Type 'ZodOptional<ZodString>' is not assignable to type 'ZodTypeAny'.
+              The types returned by 'refine(...)' are incompatible between these types.
+                Type 'ZodEffects<ZodOptional<ZodString>, any, string | undefined>' is missing the following properties from type 'ZodEffects<ZodType<any, any, any>, any, any>': _type, _output, _input, _def, and 33 more.
+  Overload 2 of 6, '(name: string, paramsSchema: ZodRawShapeCompat, annotations: { title?: string | undefined; readOnlyHint?: boolean | undefined; destructiveHint?: boolean | undefined; idempotentHint?: boolean | undefined; openWorldHint?: boolean | undefined; }, cb: (args: ShapeOutput<...>, extra: RequestHandlerExtra<...>) => { ...; } | Promise<...>): RegisteredTool', gave the following error.
+    Argument of type 'string' is not assignable to parameter of type 'ZodRawShapeCompat'.
+src/tools.ts(334,46): error TS18046: 'orgInfo' is of type 'unknown'.

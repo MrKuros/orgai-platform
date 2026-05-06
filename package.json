@@ -3,6 +3,8 @@
   "private": true,
   "workspaces": [
     "api",
-    "dashboard"
+    "dashboard",
+    "packages/core",
+    "mcp"
   ]
 }

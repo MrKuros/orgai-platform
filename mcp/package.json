@@ -1,0 +1,35 @@
+{
+  "name": "@orgai/mcp",
+  "version": "0.3.0",
+  "private": true,
+  "main": "dist/stdio.js",
+  "bin": {
+    "orgai-comply": "./dist/stdio.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/stdio.ts",
+    "start:stdio": "node dist/stdio.js",
+    "start:http": "node dist/http.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@comply/core": "*",
+    "@modelcontextprotocol/sdk": "^1.0.1",
+    "express": "^4.18.0",
+    "winston": "^3.11.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.0",
+    "@types/jest": "^29.0.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.0.0",
+    "ts-jest": "^29.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+}
