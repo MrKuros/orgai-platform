@@ -108,10 +108,15 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
       - name: Deploy API
-        run: railway up --service orgai-api api/
+        run: |
+          railway up \
+            --service orgai-api \
+            --project ${{ secrets.RAILWAY_PROJECT_ID }} \
+            --environment production \
+            --detach \
+            api/
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
 
   deploy-mcp:
     name: Deploy MCP to Railway
@@ -123,13 +128,15 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
       - name: Deploy MCP
-        # The --service name must exactly match the service name in your Railway project.
-        # If you renamed it in the Railway dashboard, update RAILWAY_MCP_SERVICE_NAME
-        # in your repo secrets (or hardcode the name here).
-        run: railway up --service ${{ secrets.RAILWAY_MCP_SERVICE_NAME || 'orgai-mcp' }} mcp/
+        run: |
+          railway up \
+            --service orgai-mcp \
+            --project ${{ secrets.RAILWAY_PROJECT_ID }} \
+            --environment production \
+            --detach \
+            mcp/
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
 
   deploy-dashboard:
     name: Deploy Dashboard to Vercel
@@ -141,10 +148,10 @@ jobs:
       - name: Install Vercel CLI
         run: npm install -g vercel
       - name: Deploy Dashboard
-        # Must run from dashboard/ so Vercel CLI picks up vercel.json and the
-        # correct project context. VERCEL_PROJECT_ID must match the project linked
-        # to the dashboard/ subdirectory in your Vercel account.
-        working-directory: dashboard
+        # Run from repo root. The Vercel project's "Root Directory" setting
+        # is already configured to "dashboard" in the Vercel UI, so the CLI
+        # resolves the correct subdirectory automatically. Adding working-directory
+        # here would double-nest the path to "dashboard/dashboard".
         run: vercel --prod --yes --token ${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
