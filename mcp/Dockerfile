@@ -1,8 +1,8 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 COPY package*.json ./
-RUN npm install
 COPY packages/core ./packages/core
+RUN npm install
 WORKDIR /app/packages/core && npm run build
 WORKDIR /app
 COPY . ./mcp/
