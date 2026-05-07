@@ -109,6 +109,9 @@ jobs:
         run: npm install -g @railway/cli
       - name: Deploy API
         run: |
+          echo "=== Railway projects accessible ==="
+          railway project list --json 2>&1 || railway project list 2>&1
+          echo "=== Attempting deploy ==="
           railway up \
             --service orgai-api \
             --project ${{ secrets.RAILWAY_PROJECT_ID }} \
