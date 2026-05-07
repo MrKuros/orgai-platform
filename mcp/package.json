@@ -20,7 +20,6 @@
     "test": "jest"
   },
   "dependencies": {
-    "@comply/core": "*",
     "@modelcontextprotocol/sdk": "^1.0.1",
     "express": "^4.18.0",
     "winston": "^3.11.0",
