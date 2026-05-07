@@ -12,7 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL_TEST }}
-      DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL_TEST }}
+      # DIRECT_DATABASE_URL must be non-empty for Prisma schema validation.
+      # Fall back to DATABASE_URL when the test DB doesn't use a separate direct URL.
+      DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL_TEST || secrets.DATABASE_URL_TEST }}
       JWT_SECRET: test-jwt-secret-for-ci-only
       WORKOS_API_KEY: placeholder
       WORKOS_CLIENT_ID: placeholder
@@ -121,7 +123,10 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
       - name: Deploy MCP
-        run: railway up --service orgai-mcp mcp/
+        # The --service name must exactly match the service name in your Railway project.
+        # If you renamed it in the Railway dashboard, update RAILWAY_MCP_SERVICE_NAME
+        # in your repo secrets (or hardcode the name here).
+        run: railway up --service ${{ secrets.RAILWAY_MCP_SERVICE_NAME || 'orgai-mcp' }} mcp/
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
@@ -136,6 +141,10 @@ jobs:
       - name: Install Vercel CLI
         run: npm install -g vercel
       - name: Deploy Dashboard
+        # Must run from dashboard/ so Vercel CLI picks up vercel.json and the
+        # correct project context. VERCEL_PROJECT_ID must match the project linked
+        # to the dashboard/ subdirectory in your Vercel account.
+        working-directory: dashboard
         run: vercel --prod --yes --token ${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
