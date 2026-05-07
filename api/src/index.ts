@@ -42,6 +42,7 @@ app.use('/v1', rateLimit({
 
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+app.get('/', (req, res) => res.json({ status: 'ok' }));
 
 // Routes
 app.use('/v1/auth', authRouter);
