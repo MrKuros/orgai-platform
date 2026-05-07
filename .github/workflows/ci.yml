@@ -105,7 +105,7 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
       - name: Deploy API
-        run: railway up --service orgai-api
+        run: railway up --service orgai-api --yes
         working-directory: api
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
@@ -120,7 +120,7 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
       - name: Deploy MCP
-        run: railway up --service orgai-mcp
+        run: railway up --service orgai-mcp --yes
         working-directory: mcp
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
@@ -135,7 +135,7 @@ jobs:
       - name: Install Vercel CLI
         run: npm install -g vercel
       - name: Deploy Dashboard
-        run: vercel --prod --token ${{ secrets.VERCEL_TOKEN }}
+        run: vercel --prod --yes --token ${{ secrets.VERCEL_TOKEN }}
         working-directory: dashboard
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
