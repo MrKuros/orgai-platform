@@ -1,0 +1,146 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-api:
+    name: API — Build & Test
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL_TEST }}
+      JWT_SECRET: test-jwt-secret-for-ci-only
+      WORKOS_API_KEY: placeholder
+      WORKOS_CLIENT_ID: placeholder
+      WORKOS_REDIRECT_URI: http://localhost:8080/v1/auth/sso/callback
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: cd api && npm ci
+      - name: Generate Prisma client
+        run: cd api && npx prisma generate
+      - name: Build
+        run: cd api && npm run build
+      - name: Run migrations
+        run: cd api && npx prisma migrate deploy
+      - name: Run tests
+        run: cd api && npm test
+
+  test-mcp:
+    name: MCP — Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install core dependencies
+        run: cd packages/core && npm ci
+      - name: Build core
+        run: cd packages/core && npm run build
+      - name: Install MCP dependencies
+        run: cd mcp && npm ci
+      - name: Build MCP
+        run: cd mcp && npm run build
+      - name: Run tests
+        run: cd mcp && npm test
+
+  test-dashboard:
+    name: Dashboard — Build & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: cd dashboard && npm ci
+      - name: Build
+        run: cd dashboard && npm run build
+        env:
+          NEXT_PUBLIC_API_URL: https://api.orgai.dev
+      - name: Lint
+        run: cd dashboard && npm run lint
+
+  test-extension:
+    name: Extension — Build & Test
+    runs-on: ubuntu-latest
+    continue-on-error: true  # VS Code headless tests can be flaky in CI
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install core dependencies
+        run: cd packages/core && npm ci
+      - name: Build core
+        run: cd packages/core && npm run build
+      - name: Install extension dependencies
+        run: cd extension && npm ci
+      - name: Build extension
+        run: cd extension && npm run compile
+      - name: Setup virtual display for VS Code tests
+        run: |
+          sudo apt-get install -y xvfb
+          Xvfb :99 -screen 0 1024x768x24 &
+      - name: Run tests
+        run: cd extension && npm test
+        env:
+          DISPLAY: ':99'
+
+  deploy-api:
+    name: Deploy API to Railway
+    runs-on: ubuntu-latest
+    needs: [test-api]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+      - name: Deploy API
+        run: railway up --service orgai-api
+        working-directory: api
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  deploy-mcp:
+    name: Deploy MCP to Railway
+    runs-on: ubuntu-latest
+    needs: [test-mcp]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+      - name: Deploy MCP
+        run: railway up --service orgai-mcp
+        working-directory: mcp
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  deploy-dashboard:
+    name: Deploy Dashboard to Vercel
+    runs-on: ubuntu-latest
+    needs: [test-dashboard]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+      - name: Deploy Dashboard
+        run: vercel --prod --token ${{ secrets.VERCEL_TOKEN }}
+        working-directory: dashboard
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

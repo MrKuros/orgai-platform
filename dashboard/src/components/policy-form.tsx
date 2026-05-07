@@ -152,7 +152,7 @@ export function PolicyForm({ defaultValues, roles, onSubmit, isLoading }: Policy
                 </label>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">If unselected, the policy will be created but won't be active until bound to a role.</p>
+            <p className="text-xs text-muted-foreground mt-1">If unselected, the policy will be created but won&apos;t be active until bound to a role.</p>
           </div>
         )}
       </div>

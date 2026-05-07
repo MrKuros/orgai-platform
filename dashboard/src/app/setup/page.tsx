@@ -410,7 +410,7 @@ export default function SetupWizard() {
                     <div className="text-sm text-muted-foreground">
                       <p>1. Open VS Code</p>
                       <p>2. Go to OrgAI Extension Settings</p>
-                      <p>3. Paste this key into "Org API Key"</p>
+                      <p>3. Paste this key into &quot;Org API Key&quot;</p>
                       <p>4. Set API URL to <code className="bg-muted px-1 rounded text-xs">{process.env.NEXT_PUBLIC_API_URL}</code></p>
                     </div>
                   </div>
