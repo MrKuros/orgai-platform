@@ -13,4 +13,4 @@ COPY --from=build /app/packages/core ./packages/core
 COPY --from=build /app/dist ./dist
 RUN mkdir -p node_modules/@comply && cp -r packages/core/dist node_modules/@comply/core && cp packages/core/package.json node_modules/@comply/core/package.json
 EXPOSE 3000
-CMD ["node", "dist/http.js"]
+CMD ["node", "dist/src/http.js"]
