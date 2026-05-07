@@ -110,7 +110,7 @@ jobs:
       - name: Deploy API
         run: |
           railway up \
-            --service orgai-api \
+            --service 9b9f18d3-68c0-49b7-8dc7-d1fdcef67341 \
             --project ${{ secrets.RAILWAY_PROJECT_ID }} \
             --environment production \
             --detach \
@@ -130,7 +130,7 @@ jobs:
       - name: Deploy MCP
         run: |
           railway up \
-            --service orgai-mcp \
+            --service 444ae619-6fb3-4a10-ba57-0fb8a854e6e5 \
             --project ${{ secrets.RAILWAY_PROJECT_ID }} \
             --environment production \
             --detach \
