@@ -129,7 +129,7 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
       - name: Copy workspace dependencies
-        run: cp -r packages/core mcp/packages/core
+        run: mkdir -p mcp/packages && cp -r packages/core mcp/packages/core
         working-directory: ${{ github.workspace }}
       - name: Deploy MCP
         run: |
