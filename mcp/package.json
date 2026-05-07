@@ -9,9 +9,6 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "workspaces": [
-    "packages/core"
-  ],
   "scripts": {
     "build": "tsc",
     "dev": "ts-node src/stdio.ts",
