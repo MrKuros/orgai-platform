@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--CSP_META-->
+    <title>Comply — Setup</title>
+    <style>
+      /* ── Reset ─────────────────────────────────── */
+      *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+      :root {
+        --bg-primary:    var(--vscode-sideBar-background);
+        --bg-secondary:  var(--vscode-editor-background);
+        --bg-input:      var(--vscode-input-background);
+        --text-primary:  var(--vscode-foreground);
+        --text-secondary:var(--vscode-descriptionForeground);
+        --text-muted:    var(--vscode-tab-unfocusedActiveForeground, #888);
+        --accent:        var(--vscode-button-background);
+        --accent-fg:     var(--vscode-button-foreground);
+        --accent-hover:  var(--vscode-button-hoverBackground);
+        --green:         var(--vscode-testing-iconPassed, #4caf50);
+        --red:           var(--vscode-errorForeground, #f44747);
+        --border:        var(--vscode-widget-border, rgba(128,128,128,0.35));
+        --input-border:  var(--vscode-input-border, rgba(128,128,128,0.5));
+        --focus-border:  var(--vscode-focusBorder);
+        --radius:        6px;
+        --font:          var(--vscode-font-family);
+        --font-mono:     var(--vscode-editor-font-family);
+      }
+
+      html, body {
+        min-height: 100vh;
+        font-family: var(--font);
+        font-size: 13px;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        line-height: 1.6;
+      }
+
+      /* ── Layout ─────────────────────────────────── */
+      .page {
+        max-width: 520px;
+        margin: 0 auto;
+        padding: 32px 24px 48px;
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+      }
+
+      /* ── Header ─────────────────────────────────── */
+      .ob-header {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        text-align: center;
+      }
+
+      .ob-logo {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+        background: var(--accent);
+        color: var(--accent-fg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        font-weight: 800;
+        letter-spacing: -1px;
+        flex-shrink: 0;
+      }
+
+      .ob-header h1 {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--text-primary);
+        letter-spacing: -0.3px;
+      }
+
+      .ob-header p {
+        font-size: 12px;
+        color: var(--text-muted);
+        max-width: 340px;
+        line-height: 1.7;
+      }
+
+      /* ── Steps ─────────────────────────────────── */
+      .ob-steps {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .ob-step {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 18px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        transition: border-color 0.2s;
+      }
+
+      .ob-step:focus-within {
+        border-color: var(--focus-border, var(--accent));
+      }
+
+      .step-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        color: var(--text-muted);
+      }
+
+      .step-num {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: var(--accent-fg);
+        font-size: 10px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      /* ── Form Elements ─────────────────────────────── */
+      label.field-label {
+        display: block;
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: 4px;
+      }
+
+      select, input[type="text"], input[type="password"] {
+        width: 100%;
+        padding: 7px 10px;
+        background: var(--bg-input);
+        border: 1px solid var(--input-border);
+        border-radius: 4px;
+        color: var(--text-primary);
+        font-family: var(--font);
+        font-size: 13px;
+        outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+        appearance: none;
+        -webkit-appearance: none;
+      }
+
+      select {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        padding-right: 30px;
+      }
+
+      select:focus, input:focus {
+        border-color: var(--focus-border, var(--accent));
+        box-shadow: 0 0 0 2px rgba(var(--accent), 0.15);
+        outline: 1px solid var(--focus-border, var(--accent));
+        outline-offset: -1px;
+      }
+
+      .muted-note {
+        font-size: 12px;
+        color: var(--text-muted);
+        font-style: italic;
+      }
+
+      /* ── Policy URL row ─────────────────────────────── */
+      .url-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .url-row input {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .btn-test {
+        flex-shrink: 0;
+        padding: 7px 12px;
+        background: transparent;
+        border: 1px solid var(--input-border);
+        border-radius: 4px;
+        color: var(--text-secondary);
+        font-family: var(--font);
+        font-size: 12px;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: border-color 0.15s, color 0.15s, background 0.15s;
+      }
+
+      .btn-test:hover:not(:disabled) {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .btn-test:disabled { opacity: 0.45; cursor: not-allowed; }
+
+      .connection-result {
+        font-size: 12px;
+        min-height: 18px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        transition: opacity 0.2s;
+      }
+
+      .connection-result.success { color: var(--green); }
+      .connection-result.failure { color: var(--red); }
+      .connection-result.testing { color: var(--text-muted); }
+
+      /* ── Save button ─────────────────────────────── */
+      .ob-footer {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+      }
+
+      .btn-save {
+        padding: 10px 20px;
+        background: var(--accent);
+        color: var(--accent-fg);
+        border: none;
+        border-radius: 6px;
+        font-family: var(--font);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: opacity 0.2s, background 0.15s;
+      }
+
+      .btn-save:hover:not(:disabled) { background: var(--accent-hover, var(--accent)); opacity: 0.9; }
+      .btn-save:disabled { opacity: 0.4; cursor: not-allowed; }
+
+      /* Spinner */
+      .spinner {
+        display: none;
+        width: 14px;
+        height: 14px;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-top-color: var(--accent-fg);
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+        flex-shrink: 0;
+      }
+
+      .btn-save.loading .spinner { display: block; }
+      .btn-save.loading .btn-save-text { opacity: 0.7; }
+
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      .hint-text {
+        font-size: 11px;
+        color: var(--text-muted);
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+
+      <!-- Header -->
+      <div class="ob-header">
+        <div class="ob-logo">C</div>
+        <h1>Welcome to Comply</h1>
+        <p>Set up your LLM provider and policy URL to get started. This only takes a minute.</p>
+      </div>
+
+      <!-- Steps -->
+      <div class="ob-steps">
+
+        <!-- Step 1 — OrgAI -->
+        <div class="ob-step">
+          <div class="step-label"><div class="step-num">1</div> Connect to your organization (optional)</div>
+          <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">
+            Connect to the OrgAI platform to automatically fetch policies and report violations to the audit trail.
+          </div>
+          <div>
+            <label class="field-label" for="orgApiKeyInput">OrgAI API Key</label>
+            <div class="url-row">
+              <input type="password" id="orgApiKeyInput" placeholder="Paste your OrgAI key…" autocomplete="off" />
+              <button class="btn-test" id="btnOrgTest" type="button">Test connection</button>
+            </div>
+          </div>
+          <details style="margin-top: 10px; font-size: 12px;">
+            <summary style="cursor: pointer; color: var(--text-secondary); margin-bottom: 4px;">Advanced</summary>
+            <div>
+              <label class="field-label" for="orgApiUrlInput">API Base URL</label>
+              <input type="text" id="orgApiUrlInput" value="https://api.orgai.dev" />
+            </div>
+          </details>
+          <div class="connection-result" id="orgConnectionResult" aria-live="polite" style="margin-top: 6px;"></div>
+        </div>
+
+        <!-- Step 2 — Provider -->
+        <div class="ob-step">
+          <div class="step-label"><div class="step-num">2</div> LLM Provider</div>
+          <div>
+            <label class="field-label" for="providerSelect">Select your LLM provider</label>
+            <select id="providerSelect">
+              <option value="groq">Groq</option>
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+              <option value="ollama">Ollama (local)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Step 3 — API Key -->
+        <div class="ob-step" id="stepApiKey">
+          <div class="step-label"><div class="step-num">3</div> API Key</div>
+          <div id="apiKeyWrapper">
+            <label class="field-label" for="apiKeyInput" id="apiKeyLabel">Groq API Key</label>
+            <input type="password" id="apiKeyInput" placeholder="Paste your API key…" autocomplete="off" />
+          </div>
+          <div id="ollamaNote" class="muted-note" style="display:none;">No API key required — Ollama runs locally on port 11434.</div>
+        </div>
+
+        <!-- Step 4 — Role -->
+        <div class="ob-step">
+          <div class="step-label"><div class="step-num">4</div> Your Role</div>
+          <div>
+            <label class="field-label" for="roleSelect">Select your role in the organisation</label>
+            <select id="roleSelect">
+              <option value="junior">Junior Developer</option>
+              <option value="senior">Senior Developer</option>
+              <option value="lead">Engineering Lead</option>
+              <option value="cto">CTO / Security</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Step 5 — Policy URL -->
+        <div class="ob-step">
+          <div class="step-label"><div class="step-num">5</div> Policy Source (Fallback)</div>
+          <div>
+            <label class="field-label" for="policyUrlInput">Remote policy URL</label>
+            <div class="url-row">
+              <input
+                type="text"
+                id="policyUrlInput"
+                placeholder="https://raw.githubusercontent.com/your-org/comply-policies/main/policies.json"
+              />
+              <button class="btn-test" id="btnTest" type="button">Test connection</button>
+            </div>
+          </div>
+          <div style="margin-top: 14px;">
+            <label class="field-label" for="authHeaderInput">Authorization header value (optional)</label>
+            <input type="password" id="authHeaderInput" placeholder="Paste Authorization header…" autocomplete="off" />
+            <div class="muted-note" style="margin-top: 6px;">e.g. token ghp_xxx  &middot;  Bearer eyJ&hellip;  &middot;  leave blank for public URLs</div>
+          </div>
+          <div class="connection-result" id="connectionResult" aria-live="polite" style="margin-top: 10px;"></div>
+        </div>
+
+      </div><!-- /ob-steps -->
+
+      <!-- Save -->
+      <div class="ob-footer">
+        <button class="btn-save" id="btnSave" type="button" disabled>
+          <div class="spinner" id="saveSpinner"></div>
+          <span class="btn-save-text" id="btnSaveText">Save and get started</span>
+        </button>
+        <div class="hint-text">Your API key and authorization header are stored in VS Code Secret Storage — never on disk in plaintext.</div>
+      </div>
+
+    </div><!-- /page -->
+
+    <script nonce="<!--NONCE-->">
+      /* global acquireVsCodeApi */
+      const vscode = acquireVsCodeApi();
+
+      // ── DOM refs ────────────────────────────────────────
+      const providerSelect     = document.getElementById('providerSelect');
+      const apiKeyWrapper      = document.getElementById('apiKeyWrapper');
+      const apiKeyLabel        = document.getElementById('apiKeyLabel');
+      const apiKeyInput        = document.getElementById('apiKeyInput');
+      const ollamaNote         = document.getElementById('ollamaNote');
+      const roleSelect         = document.getElementById('roleSelect');
+      const policyUrlInput     = document.getElementById('policyUrlInput');
+      const authHeaderInput    = document.getElementById('authHeaderInput');
+      const btnTest            = document.getElementById('btnTest');
+      const connectionResult   = document.getElementById('connectionResult');
+      const btnSave            = document.getElementById('btnSave');
+      const btnSaveText        = document.getElementById('btnSaveText');
+      const saveSpinner        = document.getElementById('saveSpinner');
+      
+      const orgApiKeyInput     = document.getElementById('orgApiKeyInput');
+      const orgApiUrlInput     = document.getElementById('orgApiUrlInput');
+      const btnOrgTest         = document.getElementById('btnOrgTest');
+      const orgConnectionResult= document.getElementById('orgConnectionResult');
+
+      // ── State ───────────────────────────────────────────
+      let connectionPassed = false;
+      let isSaving = false;
+
+      // ── Provider labels ─────────────────────────────────
+      const API_KEY_LABELS = {
+        groq:      'Groq API Key',
+        openai:    'OpenAI API Key',
+        anthropic: 'Anthropic API Key',
+        ollama:    '', // hidden
+      };
+
+      // ── Validation ───────────────────────────────────────
+      function isApiKeyOk() {
+        const p = providerSelect.value;
+        if (p === 'ollama') return true;
+        return apiKeyInput.value.trim().length > 0;
+      }
+
+      function checkSaveEnabled() {
+        btnSave.disabled = isSaving || !(isApiKeyOk() && connectionPassed);
+      }
+
+      // ── Provider change ──────────────────────────────────
+      providerSelect.addEventListener('change', () => {
+        const p = providerSelect.value;
+        if (p === 'ollama') {
+          apiKeyWrapper.style.display = 'none';
+          ollamaNote.style.display    = 'block';
+        } else {
+          apiKeyWrapper.style.display = 'block';
+          ollamaNote.style.display    = 'none';
+          apiKeyLabel.textContent     = API_KEY_LABELS[p] || 'API Key';
+          apiKeyInput.placeholder     = `Paste your ${API_KEY_LABELS[p] || 'API key'}…`;
+        }
+        checkSaveEnabled();
+      });
+
+      apiKeyInput.addEventListener('input', checkSaveEnabled);
+
+      // ── Policy URL — reset result on edit ────────────────
+      function resetConnectionResult() {
+        connectionPassed = false;
+        connectionResult.textContent = '';
+        connectionResult.className   = 'connection-result';
+        checkSaveEnabled();
+      }
+      
+      policyUrlInput.addEventListener('input', resetConnectionResult);
+      authHeaderInput.addEventListener('input', resetConnectionResult);
+
+      // ── Test connection ──────────────────────────────────
+      btnTest.addEventListener('click', () => {
+        const url = policyUrlInput.value.trim();
+        if (!url) {
+          setResult(false, 'Please enter a URL first.');
+          return;
+        }
+        btnTest.disabled = true;
+        connectionResult.className   = 'connection-result testing';
+        connectionResult.textContent = '⏳ Testing…';
+
+        vscode.postMessage({ type: 'testConnection', url, authHeader: authHeaderInput.value.trim() });
+      });
+
+      // ── Test Org connection ──────────────────────────────
+      btnOrgTest.addEventListener('click', () => {
+        const apiKey = orgApiKeyInput.value.trim();
+        if (!apiKey) {
+          setOrgResult(false, 'Please enter an API key.');
+          return;
+        }
+        btnOrgTest.disabled = true;
+        orgConnectionResult.className = 'connection-result testing';
+        orgConnectionResult.textContent = '⏳ Testing…';
+
+        vscode.postMessage({ 
+          type: 'testOrgConnection', 
+          apiKey, 
+          apiUrl: orgApiUrlInput.value.trim() 
+        });
+      });
+
+      // ── Save ─────────────────────────────────────────────
+      btnSave.addEventListener('click', () => {
+        if (btnSave.disabled || isSaving) return;
+        setSaving(true);
+
+        vscode.postMessage({
+          type:       'save',
+          orgApiKey:  orgApiKeyInput.value.trim(),
+          orgApiUrl:  orgApiUrlInput.value.trim(),
+          provider:   providerSelect.value,
+          apiKey:     apiKeyInput.value.trim(),
+          role:       roleSelect.value,
+          url:        policyUrlInput.value.trim(),
+          authHeader: authHeaderInput.value.trim(),
+        });
+      });
+
+      // ── Helpers ──────────────────────────────────────────
+      function setResult(ok, message) {
+        connectionPassed             = ok;
+        connectionResult.className   = 'connection-result ' + (ok ? 'success' : 'failure');
+        connectionResult.textContent = (ok ? '✓ ' : '✗ ') + message;
+        btnTest.disabled             = false;
+        checkSaveEnabled();
+      }
+
+      function setOrgResult(ok, message) {
+        orgConnectionResult.className   = 'connection-result ' + (ok ? 'success' : 'failure');
+        orgConnectionResult.textContent = (ok ? '✓ ' : '✗ ') + message;
+        btnOrgTest.disabled             = false;
+      }
+
+      function setSaving(saving) {
+        isSaving = saving;
+        if (saving) {
+          btnSave.classList.add('loading');
+          btnSaveText.textContent = 'Setting up…';
+          btnSave.disabled = true;
+        } else {
+          btnSave.classList.remove('loading');
+          btnSaveText.textContent = 'Save and get started';
+          checkSaveEnabled();
+        }
+      }
+
+      // ── Messages from extension ──────────────────────────
+      window.addEventListener('message', (event) => {
+        const msg = event.data;
+        switch (msg.type) {
+          case 'testResult':
+            if (msg.success) {
+              const roleCount = msg.roleCount ?? '?';
+              setResult(true, `Valid — ${roleCount} role${roleCount !== 1 ? 's' : ''} found`);
+            } else {
+              setResult(false, msg.reason || 'Connection failed');
+            }
+            break;
+          case 'orgTestResult':
+            if (msg.success) {
+              setOrgResult(true, `Connected to ${msg.orgName}`);
+            } else {
+              setOrgResult(false, msg.reason || 'Connection failed');
+            }
+            break;
+          case 'saveError':
+            setSaving(false);
+            connectionResult.className   = 'connection-result failure';
+            connectionResult.textContent = '✗ ' + (msg.reason || 'Save failed. Please try again.');
+            break;
+        }
+      });
+
+      // ── Init ─────────────────────────────────────────────
+      checkSaveEnabled();
+    </script>
+  </body>
+</html>

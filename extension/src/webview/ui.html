@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Comply Chat (legacy)</title>
+  <style>
+    /* ── Reset & Base ───────────────────────────────── */
+    *,
+    *::before,
+    *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-primary: var(--vscode-sideBar-background);
+      --bg-secondary: var(--vscode-sideBar-background);
+      --bg-tertiary: var(--vscode-sideBarSectionHeader-background);
+      --bg-input: var(--vscode-input-background);
+      --text-primary: var(--vscode-foreground);
+      --text-secondary: var(--vscode-descriptionForeground);
+      --text-muted: var(--vscode-descriptionForeground);
+      --accent: var(--vscode-button-background);
+      --accent-glow: transparent;
+      --green: var(--vscode-terminal-ansiGreen, #89d185);
+      --red: var(--vscode-terminal-ansiRed, #f48771);
+      --red-bg: var(--vscode-inputValidation-errorBackground, rgba(244, 135, 113, 0.1));
+      --red-border: var(--vscode-inputValidation-errorBorder, rgba(244, 135, 113, 0.5));
+      --orange: var(--vscode-terminal-ansiYellow, #d19a66);
+      --border: var(--vscode-widget-border);
+      --radius: 4px;
+      --radius-sm: 2px;
+      --font: var(--vscode-font-family);
+      --font-mono: var(--vscode-editor-font-family);
+    }
+
+    html,
+    body {
+      height: 100%;
+      font-family: var(--font);
+      font-size: 13px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.6;
+    }
+
+    /* ── Layout ──────────────────────────────────────── */
+    .container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Header ──────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-logo {
+      width: 26px;
+      height: 26px;
+      background: var(--vscode-button-background);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--vscode-button-foreground);
+      flex-shrink: 0;
+    }
+
+    .header-title {
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--text-primary);
+    }
+
+    .btn-icon {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      cursor: pointer;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .btn-icon:hover {
+      color: var(--text-primary);
+      border-color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    /* ── Model Selector ─────────────────────────────── */
+    .model-selector {
+      position: relative;
+    }
+
+    .model-selector select {
+      appearance: none;
+      -webkit-appearance: none;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-family: var(--font);
+      font-size: 11px;
+      padding: 4px 24px 4px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.2s ease;
+      max-width: 150px;
+    }
+
+    .model-selector select:hover {
+      border-color: var(--accent);
+      color: var(--text-primary);
+    }
+
+    .model-selector select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-glow);
+    }
+
+    .model-selector::after {
+      content: '▾';
+      position: absolute;
+      right: 7px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 10px;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    /* ── Threads Bar ─────────────────────────────────── */
+    .threads-bar {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 10px;
+      background: var(--bg-tertiary);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .threads-bar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .thread-tab {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 11px;
+      font-family: var(--font);
+      white-space: nowrap;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .thread-tab:hover {
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+    }
+
+    .thread-tab.active {
+      background: var(--bg-secondary);
+      border-color: var(--accent);
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .thread-tab .close-btn {
+      display: none;
+      width: 14px;
+      height: 14px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 12px;
+      border-radius: 3px;
+      line-height: 1;
+      padding: 0;
+      text-align: center;
+    }
+
+    .thread-tab:hover .close-btn,
+    .thread-tab.active .close-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .thread-tab .close-btn:hover {
+      background: var(--red-bg);
+      color: var(--red);
+    }
+
+    .btn-new-thread {
+      width: 24px;
+      height: 24px;
+      border: 1px dashed var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.15s ease;
+    }
+
+    .btn-new-thread:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    /* ── Messages Area ───────────────────────────────── */
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .messages::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .messages::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .messages::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+
+    /* ── Welcome State ───────────────────────────────── */
+    .welcome {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      text-align: center;
+      gap: 16px;
+      padding: 32px;
+      opacity: 0.85;
+    }
+
+    .welcome-icon {
+      width: 56px;
+      height: 56px;
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border-radius: var(--radius);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      box-shadow: none;
+    }
+
+    .welcome h2 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .welcome p {
+      font-size: 12px;
+      color: var(--text-muted);
+      max-width: 260px;
+      line-height: 1.7;
+    }
+
+    .welcome-hint {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-secondary);
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    .welcome-hint kbd {
+      background: var(--bg-tertiary);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      border: 1px solid var(--border);
+    }
+
+    /* ── Message Bubbles ─────────────────────────────── */
+    .message {
+      max-width: 92%;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-size: 13px;
+      line-height: 1.65;
+      animation: slideIn 0.2s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .message.user {
+      align-self: flex-end;
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border-bottom-right-radius: 4px;
+    }
+
+    .message.assistant {
+      align-self: flex-start;
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 4px;
+    }
+
+    .message.blocked {
+      align-self: flex-start;
+      background: var(--red-bg);
+      border: 1px solid var(--red-border);
+      border-left: 3px solid var(--red);
+      color: var(--text-primary);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    .message.tool-exec {
+      align-self: flex-start;
+      background: rgba(158, 206, 106, 0.08);
+      border: 1px solid rgba(158, 206, 106, 0.25);
+      border-left: 3px solid var(--green);
+      color: var(--green);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      padding: 8px 12px;
+    }
+
+    .message.error {
+      align-self: flex-start;
+      background: var(--red-bg);
+      border: 1px solid var(--red-border);
+      color: var(--red);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+    }
+
+    /* ── Streaming Indicator ─────────────────────────── */
+    .streaming-indicator {
+      display: none;
+      align-self: flex-start;
+      padding: 10px 14px;
+      gap: 5px;
+      align-items: center;
+    }
+
+    /* ── Thinking Box ────────────────────────────────── */
+    .thinking-box {
+      margin-bottom: 10px;
+      background: rgba(122, 162, 247, 0.05);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+    
+    .thinking-header {
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent);
+      background: rgba(122, 162, 247, 0.1);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .thinking-content {
+      padding: 8px 12px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+
+    /* ── Tool Call Box ───────────────────────────────── */
+    .tool-call-box {
+      margin: 8px 0;
+      background: var(--bg-tertiary);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+
+    .tool-call-box summary {
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-primary);
+      background: var(--bg-tertiary);
+      cursor: pointer;
+      user-select: none;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      outline: none;
+    }
+
+    .tool-call-box summary::-webkit-details-marker { display: none; }
+
+    .tool-call-box summary::before {
+      content: '▶';
+      font-size: 9px;
+      transition: transform 0.2s ease;
+      display: inline-block;
+    }
+
+    .tool-call-box[open] summary::before {
+      transform: rotate(90deg);
+    }
+
+    .tool-call-content {
+      padding: 8px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+
+    .streaming-indicator.visible {
+      display: flex;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    .dot:nth-child(2) {
+      animation-delay: 0.15s;
+    }
+
+    .dot:nth-child(3) {
+      animation-delay: 0.3s;
+    }
+
+    @keyframes pulse {
+      0%,
+      80%,
+      100% {
+        opacity: 0.25;
+        transform: scale(0.8);
+      }
+      40% {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .input-area {
+      padding: 12px 16px 16px;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .message code {
+      background: rgba(0, 0, 0, 0.2);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 0.9em;
+      color: var(--accent);
+    }
+    
+    .message strong {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .input-wrapper {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 4px 4px 4px 14px;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .input-wrapper:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .input-wrapper textarea {
+      flex: 1;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: var(--text-primary);
+      font-family: var(--font);
+      font-size: 13px;
+      line-height: 1.5;
+      resize: none;
+      min-height: 20px;
+      max-height: 120px;
+      padding: 8px 0;
+    }
+
+    .input-wrapper textarea::placeholder {
+      color: var(--text-muted);
+    }
+
+    .btn-send {
+      width: 34px;
+      height: 34px;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: transform 0.15s ease, opacity 0.2s ease;
+    }
+
+    .btn-send:hover {
+      background: var(--vscode-button-hoverBackground);
+    }
+
+    .btn-send:hover {
+      transform: scale(1.05);
+    }
+
+    .btn-send:active {
+      transform: scale(0.95);
+    }
+
+    .btn-send:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-send svg {
+      width: 16px;
+      height: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <div class="header-logo">C</div>
+        <div class="header-title">Comply</div>
+      </div>
+      <div class="model-selector">
+        <select id="modelSelect" title="Choose model">
+          <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Threads -->
+    <div class="threads-bar" id="threadsBar">
+      <button class="btn-new-thread" id="btnNewThread" title="New thread">+</button>
+    </div>
+
+    <!-- Messages -->
+    <div class="messages" id="messages"></div>
+
+    <!-- Streaming indicator -->
+    <div class="streaming-indicator" id="streamingIndicator">
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+    </div>
+
+    <!-- Input -->
+    <div class="input-area">
+      <div class="input-wrapper">
+        <textarea
+          id="userInput"
+          placeholder="Describe a coding task…"
+          rows="1"
+        ></textarea>
+        <button class="btn-send" id="btnSend" title="Send message">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+               stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Acquire VS Code API (persists state across webview hide/show)
+    const vscode = acquireVsCodeApi();
+
+    // ── State ───────────────────────────────────────
+    // threads: { [threadId]: { name, messages: [{text, type}] } }
+    const defaultState = {
+      threads: {
+        'default': { name: 'Chat 1', messages: [] }
+      },
+      activeThreadId: 'default',
+      threadCounter: 1
+    };
+
+    let state = vscode.getState() || JSON.parse(JSON.stringify(defaultState));
+
+    // DOM refs
+    const messagesEl = document.getElementById('messages');
+    const inputEl = document.getElementById('userInput');
+    const btnSend = document.getElementById('btnSend');
+    const btnNewThread = document.getElementById('btnNewThread');
+    const threadsBar = document.getElementById('threadsBar');
+    const streamingIndicator = document.getElementById('streamingIndicator');
+    const modelSelect = document.getElementById('modelSelect');
+
+    let isStreaming = false;
+    let currentAssistantBubble = null;
+    let streamingText = '';
+
+    // ── Rendering ───────────────────────────────────
+    function renderThreadTabs() {
+      // Remove all tabs (keep the + button)
+      threadsBar.querySelectorAll('.thread-tab').forEach(el => el.remove());
+
+      const ids = Object.keys(state.threads);
+      ids.forEach(id => {
+        const thread = state.threads[id];
+        const tab = document.createElement('button');
+        tab.className = 'thread-tab' + (id === state.activeThreadId ? ' active' : '');
+        tab.dataset.threadId = id;
+
+        const label = document.createElement('span');
+        label.textContent = thread.name;
+        tab.appendChild(label);
+
+        // Close button (don't show if it's the only thread)
+        if (ids.length > 1) {
+          const close = document.createElement('button');
+          close.className = 'close-btn';
+          close.textContent = '×';
+          close.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteThread(id);
+          });
+          tab.appendChild(close);
+        }
+
+        tab.addEventListener('click', () => switchThread(id));
+
+        // Insert before the + button
+        threadsBar.insertBefore(tab, btnNewThread);
+      });
+    }
+
+    function renderMessages() {
+      messagesEl.innerHTML = '';
+      const thread = state.threads[state.activeThreadId];
+
+      if (!thread || thread.messages.length === 0) {
+        // Show welcome
+        const welcome = document.createElement('div');
+        welcome.className = 'welcome';
+        welcome.innerHTML = `
+          <div class="welcome-icon">🛡️</div>
+          <h2>Comply Agent</h2>
+          <p>Your org's compliance policies are active. Ask me to write code, and I'll make sure it follows every rule.</p>
+          <div class="welcome-hint">Try: <kbd>"add a login endpoint"</kbd></div>
+        `;
+        messagesEl.appendChild(welcome);
+        return;
+      }
+
+      thread.messages.forEach(msg => {
+        const div = document.createElement('div');
+        div.className = 'message ' + msg.type;
+        if (msg.type === 'assistant') {
+          div.innerHTML = formatMessageText(msg.text);
+        } else {
+          div.textContent = msg.text;
+        }
+        messagesEl.appendChild(div);
+      });
+
+      scrollToBottom();
+    }
+
+    function scrollToBottom() {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function saveState() {
+      vscode.setState(state);
+    }
+
+    // ── Thread management ───────────────────────────
+    function switchThread(threadId) {
+      if (isStreaming) return;
+      state.activeThreadId = threadId;
+      saveState();
+      renderThreadTabs();
+      renderMessages();
+      vscode.postMessage({ type: 'switchThread', threadId });
+    }
+
+    function createNewThread() {
+      if (isStreaming) return;
+      state.threadCounter++;
+      const id = 'thread_' + Date.now();
+      const name = 'Chat ' + state.threadCounter;
+      state.threads[id] = { name, messages: [] };
+      state.activeThreadId = id;
+      saveState();
+      renderThreadTabs();
+      renderMessages();
+      vscode.postMessage({ type: 'newThread', threadId: id });
+    }
+
+    function deleteThread(threadId) {
+      if (isStreaming) return;
+      const ids = Object.keys(state.threads);
+      if (ids.length <= 1) return; // Don't delete the last thread
+
+      delete state.threads[threadId];
+      vscode.postMessage({ type: 'deleteThread', threadId });
+
+      // If we deleted the active thread, switch to the first remaining
+      if (state.activeThreadId === threadId) {
+        const remaining = Object.keys(state.threads);
+        state.activeThreadId = remaining[0];
+        vscode.postMessage({ type: 'switchThread', threadId: state.activeThreadId });
+      }
+
+      saveState();
+      renderThreadTabs();
+      renderMessages();
+    }
+
+    btnNewThread.addEventListener('click', createNewThread);
+
+    // ── Send message ────────────────────────────────
+    function sendMessage() {
+      const text = inputEl.value.trim();
+      if (!text || isStreaming) return;
+
+      // Add to state
+      const thread = state.threads[state.activeThreadId];
+      thread.messages.push({ text, type: 'user' });
+
+      // Auto-name thread from first message
+      if (thread.messages.filter(m => m.type === 'user').length === 1) {
+        thread.name = text.length > 24 ? text.slice(0, 24) + '…' : text;
+        renderThreadTabs();
+      }
+
+      saveState();
+      renderMessages();
+
+      // Send to extension
+      vscode.postMessage({ type: 'sendMessage', text, threadId: state.activeThreadId });
+
+      // Clear input
+      inputEl.value = '';
+      inputEl.style.height = 'auto';
+      btnSend.disabled = true;
+    }
+
+    btnSend.addEventListener('click', sendMessage);
+
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    // Auto-resize textarea
+    inputEl.addEventListener('input', () => {
+      inputEl.style.height = 'auto';
+      inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+      btnSend.disabled = inputEl.value.trim().length === 0;
+    });
+
+    // ── Model selector ─────────────────────────────
+    modelSelect.addEventListener('change', () => {
+      vscode.postMessage({ type: 'setModel', modelId: modelSelect.value });
+    });
+
+    // ── Handle messages from extension ──────────────
+    function formatMessageText(text) {
+      if (!text) return text;
+
+      // ── Step 1: Strip markdown code fences that wrap a tool-call block ──
+      // Matches ```json\n{...}\n``` or ```\n{...}\n``` where the body is a tool call.
+      // Must run BEFORE HTML-escaping so we're still working on raw text.
+      const fencePattern = /```(?:json)?\s*\n?([\s\S]*?)\n?```/g;
+      const collapsedPlaceholders = [];
+
+      const withoutFences = text.replace(fencePattern, (fullMatch, body) => {
+        const trimmed = body.trim();
+        // Only collapse if this fence contains a JSON tool call
+        if (!/"tool"\s*:\s*"[^"]+"/.test(trimmed)) {
+          return fullMatch; // leave non-tool-call fences untouched
+        }
+        let label = '📄 tool_call';
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (parsed.tool === 'run_terminal_command') {
+            label = `💻 run_terminal_command: ${(parsed.command || '').slice(0, 60)}`;
+          } else if (parsed.path) {
+            label = `📄 ${parsed.tool}: ${parsed.path}`;
+          } else if (parsed.tool) {
+            label = `🔧 ${parsed.tool}`;
+          }
+        } catch { /* use default label */ }
+        const idx = collapsedPlaceholders.length;
+        collapsedPlaceholders.push({ raw: trimmed, label });
+        return `\x00TOOLCALL_${idx}\x00`;
+      });
+
+      // ── Step 2: Also catch raw (unfenced) JSON tool-call blocks ──
+      const toolCallPattern = /\{[\s\S]*?"tool"\s*:\s*"[^"]+"[\s\S]*?\}/g;
+      const collapsed = withoutFences.replace(toolCallPattern, (match) => {
+        let label = '📄 tool_call';
+        try {
+          const parsed = JSON.parse(match);
+          if (parsed.tool === 'run_terminal_command') {
+            label = `💻 run_terminal_command: ${(parsed.command || '').slice(0, 60)}`;
+          } else if (parsed.path) {
+            label = `📄 ${parsed.tool}: ${parsed.path}`;
+          } else if (parsed.tool) {
+            label = `🔧 ${parsed.tool}`;
+          }
+        } catch { /* use default label */ }
+        const idx = collapsedPlaceholders.length;
+        collapsedPlaceholders.push({ raw: match, label });
+        return `\x00TOOLCALL_${idx}\x00`;
+      });
+
+      // ── Step 3: HTML-escape everything that remains ──
+      let html = collapsed.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      // ── Step 4: Restore placeholders as collapsible boxes ──
+      html = html.replace(/\x00TOOLCALL_(\d+)\x00/g, (_, idx) => {
+        const { raw, label } = collapsedPlaceholders[Number(idx)];
+        const escaped = raw.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return `<details class="tool-call-box"><summary>🔧 ${label}</summary><div class="tool-call-content">${escaped}</div></details>`;
+      });
+
+      // ── Step 5: Handle <thinking> blocks ──
+      html = html.replace(/&lt;thinking&gt;([\s\S]*?)&lt;\/thinking&gt;/g, (match, p1) => {
+        return `<div class="thinking-box"><div class="thinking-header">🛡️ Compliance Check</div><div class="thinking-content">${p1.trim()}</div></div>`;
+      });
+      if (html.includes('&lt;thinking&gt;') && !html.includes('&lt;/thinking&gt;')) {
+        const parts = html.split('&lt;thinking&gt;');
+        html = parts[0] + `<div class="thinking-box"><div class="thinking-header">🛡️ Compliance Check...</div><div class="thinking-content">${parts[1].trim()}</div></div>`;
+      }
+
+      // ── Step 6: Basic Markdown (bold, inline code, multiline code) ──
+      // Multiline code blocks (if not collapsed as tool calls)
+      html = html.replace(/```[a-z]*\n([\s\S]*?)\n```/g, '<pre style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; overflow-x: auto; font-family: var(--font-mono); font-size: 11px;">$1</pre>');
+      // Bold
+      html = html.replace(/\*\*([\s\S]*?)\*\*/g, '<strong>$1</strong>');
+      // Inline code
+      html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+      return html;
+    }
+
+    function appendLiveMessage(text, type) {
+      const div = document.createElement('div');
+      div.className = 'message ' + type;
+      if (type === 'assistant') {
+        div.innerHTML = formatMessageText(text);
+      } else {
+        div.textContent = text;
+      }
+      messagesEl.appendChild(div);
+      scrollToBottom();
+      return div;
+    }
+
+    window.addEventListener('message', (event) => {
+      const msg = event.data;
+      const thread = state.threads[state.activeThreadId];
+      if (!thread) return;
+
+      switch (msg.type) {
+        case 'streamStart':
+          isStreaming = true;
+          btnSend.disabled = true;
+          streamingIndicator.classList.add('visible');
+          streamingText = '';
+          currentAssistantBubble = appendLiveMessage('', 'assistant');
+          break;
+
+        case 'streamToken':
+          if (currentAssistantBubble) {
+            streamingText += msg.token;
+            currentAssistantBubble.innerHTML = formatMessageText(streamingText);
+            scrollToBottom();
+          }
+          break;
+
+        case 'streamEnd':
+          isStreaming = false;
+          btnSend.disabled = inputEl.value.trim().length === 0;
+          streamingIndicator.classList.remove('visible');
+          // Save the completed message
+          if (streamingText) {
+            thread.messages.push({ text: streamingText, type: 'assistant' });
+            saveState();
+          }
+          currentAssistantBubble = null;
+          streamingText = '';
+          break;
+
+        case 'blocked':
+          thread.messages.push({ text: msg.message, type: 'blocked' });
+          saveState();
+          appendLiveMessage(msg.message, 'blocked');
+          break;
+
+        case 'toolExec':
+          thread.messages.push({ text: msg.message, type: 'tool-exec' });
+          saveState();
+          appendLiveMessage(msg.message, 'tool-exec');
+          break;
+
+        case 'error':
+          thread.messages.push({ text: '⚠ Error: ' + msg.message, type: 'error' });
+          saveState();
+          appendLiveMessage('⚠ Error: ' + msg.message, 'error');
+          isStreaming = false;
+          btnSend.disabled = inputEl.value.trim().length === 0;
+          streamingIndicator.classList.remove('visible');
+          currentAssistantBubble = null;
+          streamingText = '';
+          break;
+
+        case 'modelConfig':
+          // Populate model dropdown from extension
+          modelSelect.innerHTML = '';
+          (msg.models || []).forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m.id;
+            opt.textContent = m.label;
+            if (m.id === msg.currentModel) opt.selected = true;
+            modelSelect.appendChild(opt);
+          });
+          break;
+      }
+    });
+
+    // ── Initial render ──────────────────────────────
+    renderThreadTabs();
+    renderMessages();
+
+    // Notify extension of active thread on load
+    vscode.postMessage({ type: 'switchThread', threadId: state.activeThreadId });
+
+    // Signal that the webview JS is ready — triggers modelConfig response
+    vscode.postMessage({ type: 'ready' });
+  </script>
+</body>
+</html>

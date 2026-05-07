@@ -1,0 +1,59 @@
+{
+  "hierarchy": [
+    {
+      "role": "cto",
+      "displayName": "CTO / Security",
+      "policies": [
+        {
+          "id": "no-hardcoded-secrets",
+          "rule": "Never hardcode secrets, API keys, or credentials in source code.",
+          "skill": "If you need a secret or API key, always read it from process.env.YOUR_KEY_NAME.",
+          "evaluator": {
+            "type": "regex",
+            "pattern": "(api_key|secret|password|token|apikey|api_secret|pass)\\s*=\\s*['\"][^'\"]{8,}['\"]",
+            "flags": "i"
+          },
+          "fix_suggestion": "Move the value to a .env file and read it with process.env.YOUR_KEY_NAME.",
+          "severity": "error"
+        },
+        {
+          "id": "approved-packages-only",
+          "rule": "Only use libraries from the approved list: lodash, axios, zod, express, pg, prisma.",
+          "skill": "Before installing any package, check if it is in the approved list.",
+          "evaluator": {
+            "type": "command",
+            "pattern": "npm\\s+(install|i|add)|yarn\\s+(add)|pnpm\\s+(add)"
+          },
+          "fix_suggestion": "Request approval for this package from your engineering lead before installing.",
+          "severity": "error"
+        }
+      ]
+    },
+    {
+      "role": "lead",
+      "displayName": "Engineering Lead",
+      "inheritsFrom": "cto",
+      "policies": [
+        {
+          "id": "no-console-log",
+          "rule": "Do not use console.log in production code — use the internal logger.",
+          "skill": "Never use console.log(), console.warn(), or console.error() directly.",
+          "evaluator": {
+            "type": "regex",
+            "pattern": "console\\.(log|warn|error|info)\\s*\\(",
+            "flags": ""
+          },
+          "fix_suggestion": "Replace console.log with logger.info (import logger from './logger').",
+          "severity": "warning"
+        }
+      ]
+    },
+    {
+      "role": "junior",
+      "displayName": "Junior Developer",
+      "inheritsFrom": "lead",
+      "policies": []
+    }
+  ],
+  "currentUserRole": "junior"
+}

@@ -42,7 +42,7 @@ export default function LoginPage() {
     try {
       setIsLoading(true);
       const res = await apiLogin(data);
-      login(res.token, res.user);
+      login(res.token, res.user, res.org);
       // router.push is handled by middleware once session is set, but we can also do it contextually
     } catch (error) {
       toast({

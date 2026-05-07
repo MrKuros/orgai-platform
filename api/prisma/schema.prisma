@@ -140,6 +140,9 @@ model AuditLog {
 
   org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   actor      User?        @relation(fields: [actorId], references: [id])
+
+  @@index([orgId, createdAt(sort: Desc)])
+  @@index([orgId, action, createdAt(sort: Desc)])
 }
 
 model Webhook {

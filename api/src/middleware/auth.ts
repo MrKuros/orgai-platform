@@ -17,13 +17,9 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     }
 
     const payload = verifyToken(token);
-    const user = await prisma.user.findUnique({ where: { id: payload.userId } });
-
-    if (!user) {
-      return res.status(401).json({ error: 'Unauthorized: User not found' });
-    }
-
-    req.user = user;
+    
+    // Trust the JWT payload to avoid a DB query on every request
+    req.user = { id: payload.userId, email: payload.email } as any;
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Unauthorized: Invalid token' });
@@ -69,6 +65,10 @@ export async function requireApiKey(req: Request, res: Response, next: NextFunct
 export function requireOrgRole(...roles: MembershipRole[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
+      if (req.apiKeyRecord) {
+        return next();
+      }
+
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized: User context missing' });
       }

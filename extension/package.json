@@ -1,0 +1,198 @@
+{
+  "name": "@orgai/extension",
+  "displayName": "Comply",
+  "description": "A coding agent with mandatory org compliance policies",
+  "version": "0.2.0",
+  "publisher": "orgai",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/orgai/comply.git"
+  },
+  "bugs": {
+    "url": "https://github.com/orgai/comply/issues"
+  },
+  "homepage": "https://github.com/orgai/comply#readme",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:comply.chatView",
+    "onCommand:comply.openChat",
+    "onCommand:comply.reloadPolicies",
+    "onCommand:comply.setApiKey",
+    "onCommand:comply.clearApiKey",
+    "onCommand:comply.openSetup"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Comply",
+      "properties": {
+        "comply.context.mode": {
+          "type": "string",
+          "default": "tree",
+          "enum": [
+            "tree",
+            "fullTs"
+          ],
+          "enumDescriptions": [
+            "Only send a workspace file tree summary.",
+            "Also send TypeScript source context (bounded); higher risk for private code."
+          ],
+          "description": "Controls what workspace context is sent to the model with each request."
+        },
+        "comply.llm.provider": {
+          "type": "string",
+          "default": "groq",
+          "enum": [
+            "groq",
+            "openai",
+            "openaiCompatible",
+            "anthropic",
+            "gemini"
+          ],
+          "description": "Which LLM provider Comply uses."
+        },
+        "comply.llm.model": {
+          "type": "string",
+          "default": "llama-3.3-70b-versatile",
+          "description": "Model id to use for the selected provider."
+        },
+        "comply.llm.openai.baseUrl": {
+          "type": "string",
+          "default": "https://api.openai.com/v1",
+          "description": "Base URL for the OpenAI API (ignored for other providers)."
+        },
+        "comply.llm.openaiCompatible.baseUrl": {
+          "type": "string",
+          "default": "http://localhost:11434/v1",
+          "description": "Base URL for OpenAI-compatible APIs (e.g. local, gateway, proxies)."
+        },
+        "comply.llm.request.timeoutMs": {
+          "type": "number",
+          "default": 60000,
+          "minimum": 5000,
+          "description": "LLM request timeout in milliseconds."
+        },
+        "comply.llm.maxFixAttempts": {
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Maximum number of autonomous fix attempts for compile/lint errors."
+        },
+        "comply.policies.url": {
+          "type": "string",
+          "default": "",
+          "description": "Comply: Policy URL. Remote URL to fetch policies from (JSON format). If set, this overrides all local policies."
+        },
+        "comply.provider": {
+          "type": "string",
+          "enum": ["groq", "openai", "anthropic", "ollama"],
+          "default": "groq",
+          "description": "Comply: LLM provider"
+        },
+        "comply.currentUserRole": {
+          "type": "string",
+          "enum": ["junior", "senior", "lead", "cto"],
+          "default": "junior",
+          "description": "Comply: Your role in the org hierarchy"
+        },
+        "comply.org.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "OrgAI platform API key. When set, policies are fetched from the platform and all violations are logged to the audit trail. Value is stored securely in VS Code Secret Storage, not in settings.json."
+        },
+        "comply.org.apiUrl": {
+          "type": "string",
+          "default": "https://api.orgai.dev",
+          "description": "OrgAI platform API base URL. Change this for self-hosted deployments."
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "comply-sidebar",
+          "title": "Comply",
+          "icon": "$(shield)"
+        }
+      ]
+    },
+    "views": {
+      "comply-sidebar": [
+        {
+          "type": "webview",
+          "id": "comply.chatView",
+          "name": "Comply Chat"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "comply.openChat",
+        "title": "Comply: Open Chat"
+      },
+      {
+        "command": "comply.reloadPolicies",
+        "title": "Comply: Reload Policies"
+      },
+      {
+        "command": "comply.setApiKey",
+        "title": "Comply: Set API Key"
+      },
+      {
+        "command": "comply.clearApiKey",
+        "title": "Comply: Clear API Key"
+      },
+      {
+        "command": "comply.openSetup",
+        "title": "Comply: Open Setup Panel"
+      },
+      {
+        "command": "comply.openOnboarding",
+        "title": "Comply: Open Onboarding"
+      }
+    ]
+  },
+  "files": [
+    "out/**",
+    "media/**",
+    "config/**",
+    "package.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "tsc -p ./ --noEmit",
+    "format": "prettier -w \"src/**/*.ts\" \"media/**/*.{js,css}\"",
+    "test": "jest src/test",
+    "test:integration": "node scripts/test-remote-fetch.js",
+    "test:e2e": "node out/test/runTests.js",
+    "test:ai": "node scripts/ai-tester.js"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.0.0",
+    "jest": "^30.3.0",
+    "mocha": "^10.4.0",
+    "prettier": "^3.2.5",
+    "ts-jest": "^29.4.9",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@comply/core": "*",
+    "groq-sdk": "^0.5.0"
+  }
+}

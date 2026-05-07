@@ -71,7 +71,7 @@ export default function SignupPage() {
     try {
       setIsLoading(true);
       const res = await apiSignup(data);
-      login(res.token, res.user);
+      login(res.token, res.user, res.org);
       router.push('/setup');
     } catch (error) {
       toast({

@@ -5,6 +5,7 @@
     "api",
     "dashboard",
     "packages/core",
-    "mcp"
+    "mcp",
+    "extension"
   ]
 }

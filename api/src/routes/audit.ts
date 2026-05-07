@@ -5,17 +5,8 @@ import { authOrApiKey } from '../middleware/authOrApiKey';
 
 export const auditRouter = Router();
 
-auditRouter.get('/:orgId/audit', authOrApiKey, async (req, res) => {
-  if (req.user) {
-    const membership = await prisma.membership.findUnique({
-      where: { orgId_userId: { orgId: req.params.orgId, userId: req.user.id } },
-      include: { org: true }
-    });
-    if (!membership || !['ORG_ADMIN', 'POLICY_ADMIN'].includes(membership.role)) {
-      return res.status(403).json({ error: 'Forbidden: Insufficient role' });
-    }
-    req.org = membership.org;
-  } else if (req.apiKeyRecord) {
+auditRouter.get('/:orgId/audit', authOrApiKey, requireOrgRole('ORG_ADMIN', 'POLICY_ADMIN'), async (req, res) => {
+  if (req.apiKeyRecord) {
     if (!req.apiKeyRecord.scopes.includes('audit:read')) {
       return res.status(403).json({ error: 'Forbidden: Missing audit:read scope' });
     }

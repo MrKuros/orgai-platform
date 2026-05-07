@@ -86,7 +86,10 @@ const loginSchema = z.object({
 authRouter.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
   const { email, password } = req.body;
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({ 
+    where: { email },
+    include: { memberships: { include: { org: true } } }
+  });
   if (!user || !user.passwordHash) return res.status(401).json({ error: 'Invalid credentials' });
 
   const valid = await bcrypt.compare(password, user.passwordHash);
@@ -94,7 +97,13 @@ authRouter.post('/login', authLimiter, validate(loginSchema), async (req, res) =
 
   const token = signToken({ userId: user.id, email: user.email });
   res.cookie('orgai_session', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
-  res.json({ token, user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName } });
+  
+  const org = user.memberships[0]?.org;
+  res.json({ 
+    token, 
+    user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, memberships: user.memberships },
+    org: org ? { id: org.id, name: org.name, slug: org.slug } : undefined
+  });
 });
 
 authRouter.get('/sso/:orgSlug', async (req, res) => {
@@ -175,7 +184,18 @@ authRouter.get('/sso/callback', async (req, res) => {
 
     const token = signToken({ userId: user.id, email: user.email });
     res.cookie('orgai_session', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
-    res.json({ token, user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName } });
+    
+    // Fetch full user with memberships to get the org
+    const fullUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      include: { memberships: { include: { org: true } } }
+    });
+    
+    res.json({ 
+      token, 
+      user: fullUser,
+      org: { id: org.id, name: org.name, slug: org.slug }
+    });
   } catch (error) {
     res.status(500).json({ error: 'SSO login failed' });
   }
