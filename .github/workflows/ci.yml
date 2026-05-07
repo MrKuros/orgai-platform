@@ -24,7 +24,7 @@ jobs:
           node-version: 20
           cache: npm
       - name: Install dependencies
-        run: cd api && npm ci
+        run: npm ci
       - name: Generate Prisma client
         run: cd api && npx prisma generate
       - name: Build
@@ -43,12 +43,10 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - name: Install core dependencies
-        run: cd packages/core && npm ci
+      - name: Install dependencies
+        run: npm ci
       - name: Build core
         run: cd packages/core && npm run build
-      - name: Install MCP dependencies
-        run: cd mcp && npm ci
       - name: Build MCP
         run: cd mcp && npm run build
       - name: Run tests
@@ -64,7 +62,7 @@ jobs:
           node-version: 20
           cache: npm
       - name: Install dependencies
-        run: cd dashboard && npm ci
+        run: npm ci
       - name: Build
         run: cd dashboard && npm run build
         env:
@@ -82,12 +80,10 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - name: Install core dependencies
-        run: cd packages/core && npm ci
+      - name: Install dependencies
+        run: npm ci
       - name: Build core
         run: cd packages/core && npm run build
-      - name: Install extension dependencies
-        run: cd extension && npm ci
       - name: Build extension
         run: cd extension && npm run compile
       - name: Setup virtual display for VS Code tests
