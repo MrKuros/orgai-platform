@@ -135,7 +135,6 @@ jobs:
             --project ${{ secrets.RAILWAY_PROJECT_ID }} \
             --environment production \
             --detach \
-            --path-as-root \
             mcp/
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
