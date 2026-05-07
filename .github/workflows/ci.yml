@@ -110,7 +110,7 @@ jobs:
       - name: Deploy API
         run: |
           railway up \
-            --service 9b9f18d3-68c0-49b7-8dc7-d1fdcef67341 \
+            --service orgai-api \
             --project ${{ secrets.RAILWAY_PROJECT_ID }} \
             --environment production \
             --detach \
@@ -130,7 +130,7 @@ jobs:
       - name: Deploy MCP
         run: |
           railway up \
-            --service 444ae619-6fb3-4a10-ba57-0fb8a854e6e5 \
+            --service orgai-mcp \
             --project ${{ secrets.RAILWAY_PROJECT_ID }} \
             --environment production \
             --detach \
@@ -148,11 +148,7 @@ jobs:
       - name: Install Vercel CLI
         run: npm install -g vercel
       - name: Deploy Dashboard
-        # Run from repo root. The Vercel project's "Root Directory" setting
-        # is already configured to "dashboard" in the Vercel UI, so the CLI
-        # resolves the correct subdirectory automatically. Adding working-directory
-        # here would double-nest the path to "dashboard/dashboard".
-        run: vercel --prod --yes --token ${{ secrets.VERCEL_TOKEN }}
+        run: vercel --prod --yes --cwd dashboard --token ${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
