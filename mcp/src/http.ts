@@ -57,7 +57,7 @@ app.post("/messages", async (req: Request, res: Response) => {
   }
 });
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 const httpServer = app.listen(PORT, () => {
   console.log(`Comply MCP server listening on port ${PORT}`);
 });
