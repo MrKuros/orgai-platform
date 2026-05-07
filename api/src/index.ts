@@ -61,7 +61,7 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
   res.status(500).json({ error: 'Internal server error' });
 });
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 80;
 
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
