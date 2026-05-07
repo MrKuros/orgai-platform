@@ -12,4 +12,4 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 EXPOSE 8080
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+CMD ["sh", "-c", "node dist/index.js & (sleep 5 && npx prisma migrate deploy && kill $$) & wait"]
