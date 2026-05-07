@@ -1,13 +1,12 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 COPY package*.json ./
-COPY packages/core/package*.json ./packages/core/
-COPY mcp/package*.json ./mcp/
-RUN npm ci --workspace=@orgai/mcp --workspace=@comply/core --include-workspace-root
+RUN npm install
 COPY packages/core ./packages/core
-COPY mcp ./mcp
-RUN npm run build --workspace=@comply/core
-RUN npm run build --workspace=@orgai/mcp
+WORKDIR /app/packages/core && npm run build
+WORKDIR /app
+COPY . ./mcp/
+WORKDIR /app/mcp && npm run build
 
 FROM node:20-alpine AS runtime
 WORKDIR /app
