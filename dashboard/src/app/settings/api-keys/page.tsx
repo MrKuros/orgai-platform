@@ -1,10 +1,10 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { format } from 'date-fns';
-import { Key, Plus, Trash2, AlertTriangle } from 'lucide-react';
+import { Key, Plus, Trash2, AlertTriangle, ChevronDown } from 'lucide-react';
 
 import { useAuth } from '@/lib/auth';
 import { fetcher, createApiKey, deleteApiKey, ApiError } from '@/lib/api';
@@ -21,6 +21,22 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 
+type CreatePreset = 'vscode' | 'mcp' | null;
+
+const MCP_URL = process.env.NEXT_PUBLIC_MCP_URL || 'https://mcp.orgai.dev';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+
+const AGENTS = [
+  'Claude Code',
+  'Cursor',
+  'Antigravity',
+  'Windsurf',
+  'Cline',
+  'Continue.dev',
+  'OpenCode',
+  'Any MCP-compatible agent',
+];
+
 function formatDate(dateStr: string | null) {
   if (!dateStr) return 'Never';
   return format(new Date(dateStr), 'MMM d, yyyy');
@@ -29,17 +45,22 @@ function formatDate(dateStr: string | null) {
 export default function ApiKeysPage() {
   const { currentOrg } = useAuth();
   const { toast } = useToast();
-  
+
   const { data, mutate, isLoading } = useSWR<any>(
     currentOrg ? `/orgs/${currentOrg.id}/api-keys` : null,
     fetcher
   );
-  
+
   const apiKeys = data?.apiKeys || [];
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'vscode' | 'mcp'>('vscode');
 
   // Create state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createPreset, setCreatePreset] = useState<CreatePreset>(null);
   const [newKeyName, setNewKeyName] = useState('');
+  const [newKeyScopes, setNewKeyScopes] = useState<string[]>(['check', 'resolve']);
   const [isCreating, setIsCreating] = useState(false);
   const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null);
 
@@ -47,19 +68,43 @@ export default function ApiKeysPage() {
   const [keyToDelete, setKeyToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Open create dialog with preset
+  const openCreateDialog = (preset: CreatePreset) => {
+    if (preset === 'vscode') {
+      setNewKeyName('VS Code Extension');
+      setNewKeyScopes(['check', 'resolve', 'admin']);
+    } else if (preset === 'mcp') {
+      setNewKeyName('MCP Agent');
+      setNewKeyScopes(['check', 'resolve']);
+    } else {
+      setNewKeyName('');
+      setNewKeyScopes(['check', 'resolve']);
+    }
+    setCreatePreset(preset);
+    setIsCreateOpen(true);
+  };
+
+  // Reset key after it's been shown
+  useEffect(() => {
+    if (newlyCreatedKey && activeTab === 'mcp') {
+      // Auto-focus on the newly created key scenario - user will see it in the config
+    }
+  }, [newlyCreatedKey, activeTab]);
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentOrg || !newKeyName.trim()) return;
-    
+
     setIsCreating(true);
     try {
       const res = await createApiKey(currentOrg.id, {
         name: newKeyName.trim(),
-        scopes: ['check', 'resolve'],
+        scopes: newKeyScopes,
       });
       mutate();
       setNewlyCreatedKey(res.key);
       setNewKeyName('');
+      setNewKeyScopes(['check', 'resolve']);
       setIsCreateOpen(false);
     } catch (error) {
       toast({
@@ -98,7 +143,7 @@ export default function ApiKeysPage() {
           title="API Keys"
           description="Manage keys for the VS Code extension and other API consumers."
           action={
-            <Button onClick={() => setIsCreateOpen(true)}>
+            <Button onClick={() => openCreateDialog(null)}>
               <Plus className="w-4 h-4 mr-2" /> New API Key
             </Button>
           }
@@ -134,7 +179,7 @@ export default function ApiKeysPage() {
             title="No API keys yet"
             description="Create an API key to connect the VS Code extension or other integrations."
             action={
-              <Button onClick={() => setIsCreateOpen(true)}>
+              <Button onClick={() => openCreateDialog(null)}>
                 <Plus className="w-4 h-4 mr-2" /> Create API Key
               </Button>
             }
@@ -199,28 +244,139 @@ export default function ApiKeysPage() {
           </div>
         )}
 
-        {/* Usage Guide */}
-        <div className="mt-8 p-6 bg-card border rounded-lg space-y-4">
-          <h3 className="font-semibold text-lg">Usage Guide</h3>
-          <div className="space-y-3 text-sm text-muted-foreground">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <p className="font-medium text-foreground">VS Code Extension</p>
-                <ol className="list-decimal list-inside space-y-1">
-                  <li>Open VS Code Settings</li>
-                  <li>Search for &quot;OrgAI&quot;</li>
-                  <li>Paste your API key in <code className="bg-muted px-1 rounded text-xs">orgai.apiKey</code></li>
-                  <li>Set API URL to <code className="bg-muted px-1 rounded text-xs">{process.env.NEXT_PUBLIC_API_URL}</code></li>
-                </ol>
-              </div>
-              <div className="space-y-2">
-                <p className="font-medium text-foreground">Direct API Access</p>
-                <pre className="bg-muted p-3 rounded text-xs font-mono whitespace-pre-wrap break-all">
-{`curl -H "Authorization: Bearer <your-key>" \\
-  ${process.env.NEXT_PUBLIC_API_URL}/v1/check`}
-                </pre>
-              </div>
+{/* Connection Instructions */}
+        <div className="mt-8 p-6 bg-card border rounded-lg space-y-6">
+          {/* Tabs */}
+          <div className="space-y-4">
+            <div className="flex gap-1 border-b">
+              <button
+                onClick={() => setActiveTab('vscode')}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  activeTab === 'vscode'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                VS Code Extension
+              </button>
+              <button
+                onClick={() => setActiveTab('mcp')}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  activeTab === 'mcp'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                MCP Agent
+              </button>
             </div>
+
+            {/* VS Code Tab */}
+            {activeTab === 'vscode' && (
+              <div className="space-y-4">
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <p className="text-sm font-medium mb-3">Connection Instructions</p>
+                  <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
+                    <li>Open VS Code Settings</li>
+                    <li>Search for &quot;OrgAI&quot;</li>
+                    <li>Paste your API key in <code className="bg-muted px-1 rounded text-xs">orgai.apiKey</code></li>
+                    <li>Set API URL to <code className="bg-muted px-1 rounded text-xs">{API_URL}</code></li>
+                  </ol>
+                </div>
+                <div className="flex justify-end">
+                  <Button variant="outline" size="sm" onClick={() => openCreateDialog('vscode')}>
+                    <Plus className="w-4 h-4 mr-2" /> New VS Code Key
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* MCP Tab */}
+            {activeTab === 'mcp' && (
+              <div className="space-y-6">
+                {/* Step 1 */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold">Step 1 — Generate an API key</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Create a key with <code className="bg-muted px-1 rounded text-xs">check</code> and{' '}
+                    <code className="bg-muted px-1 rounded text-xs">resolve</code> scopes.
+                  </p>
+                  <Button variant="outline" size="sm" onClick={() => openCreateDialog('mcp')}>
+                    <Plus className="w-4 h-4 mr-2" /> New MCP Agent Key
+                  </Button>
+                </div>
+
+                {/* Step 2 */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold">Step 2 — Add to your agent config</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Copy this into your MCP agent&apos;s configuration file:
+                  </p>
+                  <div className="bg-muted/50 rounded-lg p-4 overflow-x-auto">
+                    <div className="flex items-start gap-3">
+                      <pre className="flex-1 text-sm font-mono text-left whitespace-pre">{`{
+  "mcpServers": {
+    "orgai": {
+      "url": "${MCP_URL}/sse",
+      "env": {
+        "COMPLY_API_KEY": "${newlyCreatedKey || 'your-api-key-here'}"
+      }
+    }
+  }
+}`}</pre>
+                      <CopyButton
+                        value={`{
+  "mcpServers": {
+    "orgai": {
+      "url": "${MCP_URL}/sse",
+      "env": {
+        "COMPLY_API_KEY": "${newlyCreatedKey || 'your-api-key-here'}"
+      }
+    }
+  }
+}`}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 3 */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold">Step 3 — Supported agents</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {AGENTS.map((agent) => (
+                      <span
+                        key={agent}
+                        className="px-3 py-1 bg-muted rounded-full text-xs font-medium"
+                      >
+                        {agent}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Step 4 - Advanced */}
+                <details className="group">
+                  <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground list-none">
+                    <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+                    Step 4 — Self-hosted MCP
+                  </summary>
+                  <div className="mt-3 pl-6 space-y-2 text-sm text-muted-foreground">
+                    <p>If you&apos;re running the MCP server locally or self-hosted, replace the URL with your own:</p>
+                    <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <code className="bg-muted px-1 rounded text-xs">http://localhost:3001/sse</code>
+                        <span className="text-xs text-muted-foreground">(local dev)</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <code className="bg-muted px-1 rounded text-xs">https://your-domain.com/sse</code>
+                        <span className="text-xs text-muted-foreground">(self-hosted)</span>
+                      </div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -245,13 +401,40 @@ export default function ApiKeysPage() {
                 disabled={isCreating}
                 required
               />
-              <p className="text-xs text-muted-foreground">Scopes: check, resolve (read-only access)</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Scopes</Label>
+              <div className="flex flex-wrap gap-2">
+                {['check', 'resolve', 'admin'].map((scope) => (
+                  <label key={scope} className="flex items-center gap-1.5 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={newKeyScopes.includes(scope)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setNewKeyScopes([...newKeyScopes, scope]);
+                        } else {
+                          setNewKeyScopes(newKeyScopes.filter(s => s !== scope));
+                        }
+                      }}
+                      disabled={isCreating || scope === 'check'}
+                      className="rounded border-input"
+                    />
+                    <code className="bg-muted px-1 rounded text-xs">{scope}</code>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {newKeyScopes.includes('admin')
+                  ? 'Full access including admin operations'
+                  : 'Read-only access (check and resolve)'}
+              </p>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)} disabled={isCreating}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isCreating || !newKeyName.trim()}>
+              <Button type="submit" disabled={isCreating || !newKeyName.trim() || newKeyScopes.length === 0}>
                 {isCreating && <Spinner className="mr-2 h-4 w-4" />}
                 Create Key
               </Button>
