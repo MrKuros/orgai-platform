@@ -72,6 +72,15 @@ export class PolicyEngine {
         
         this.buildSystemPromptAPI(response.resolvedFrom, response.policies, response.role.displayName);
         this.output?.appendLine(`[Comply] Policies loaded from OrgAI platform: ${this.orgInfo.orgName} (${response.role.displayName})`);
+
+        // Show warnings for policy conflicts
+        if (response.warnings && response.warnings.length > 0) {
+          for (const warning of response.warnings) {
+            const msg = `Comply Warning: Your local policy '${warning.policyName}' was overridden by the organization policy from '${warning.overriddenByRole}'.`;
+            this.output?.appendLine(`[Comply] ${msg}`);
+            vscode.window.showWarningMessage(msg);
+          }
+        }
         return;
       } catch (e: any) {
         this.output?.appendLine(`[Comply] OrgAI API unavailable (${e.message}), falling back to next source`);

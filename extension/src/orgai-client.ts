@@ -12,6 +12,11 @@ export interface ResolvedPoliciesResponse {
   role: { id: string; name: string; displayName: string };
   resolvedFrom: string[];
   policies: any[];
+  warnings?: Array<{
+    policyName: string;
+    overriddenByRole: string;
+    originalRole: string;
+  }>;
 }
 
 export class OrgAIClient {

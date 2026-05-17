@@ -30,6 +30,7 @@ export async function resolveRolePolicies(orgId: string, roleName: string) {
   const resolvedFrom: string[] = [];
   let currentRoleId: string | null = role.id;
   const policyMap = new Map<string, any>();
+  const warnings: { policyName: string; overriddenByRole: string; originalRole: string }[] = [];
 
   const allRoles = await prisma.role.findMany({
     where: { orgId },
@@ -43,13 +44,24 @@ export async function resolveRolePolicies(orgId: string, roleName: string) {
     resolvedFrom.push(currentRole.name);
 
     for (const binding of currentRole.bindings) {
-      if (!policyMap.has(binding.policy.id)) {
-        policyMap.set(binding.policy.id, {
-          ...binding.policy,
-          setByRole: currentRole.name,
-          setByDisplayName: currentRole.displayName
+      const policyName = binding.policy.name;
+      const existingPolicy = policyMap.get(policyName);
+
+      if (existingPolicy) {
+        // Ancestor policy dominates - subordinate policy was overridden
+        warnings.push({
+          policyName,
+          overriddenByRole: currentRole.name,
+          originalRole: existingPolicy.setByRole
         });
       }
+
+      // Always set/update the policy (ancestor dominates)
+      policyMap.set(policyName, {
+        ...binding.policy,
+        setByRole: currentRole.name,
+        setByDisplayName: currentRole.displayName
+      });
     }
 
     currentRoleId = currentRole.inheritsFromId;
@@ -58,7 +70,8 @@ export async function resolveRolePolicies(orgId: string, roleName: string) {
   const responseData = {
     role: { id: role.id, name: role.name, displayName: role.displayName },
     resolvedFrom: resolvedFrom.reverse(), // Root first
-    policies: Array.from(policyMap.values())
+    policies: Array.from(policyMap.values()),
+    warnings
   };
 
   cache.set(cacheKey, { data: responseData, expires: Date.now() + 5 * 60 * 1000 });
