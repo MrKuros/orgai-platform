@@ -44,6 +44,18 @@ describe('Resolve & Check Routes', () => {
         roleIds: [ctoRoleId]
       });
 
+    // Create a conflicting policy on Junior role (same name as CTO's policy)
+    await request(app)
+      .post(`/v1/orgs/${orgId}/policies`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: 'no-secret',
+        rule: 'Different rule - secrets are allowed in junior mode',
+        evaluatorType: 'none',
+        severity: 'WARNING',
+        roleIds: [juniorRoleId]
+      });
+
     const keyRes = await request(app)
       .post(`/v1/orgs/${orgId}/api-keys`)
       .set('Authorization', `Bearer ${adminToken}`)
@@ -105,5 +117,23 @@ describe('Resolve & Check Routes', () => {
         roleName: 'junior'
       });
     expect(res.status).toBe(401);
+  });
+
+  it('GET /v1/orgs/:orgId/resolve/junior returns warning when policy name conflicts with ancestor', async () => {
+    const res = await request(app)
+      .get(`/v1/orgs/${orgId}/resolve/junior`)
+      .set('x-api-key', apiKey);
+    expect(res.status).toBe(200);
+    // Should have warnings array
+    expect(res.body.warnings).toBeDefined();
+    expect(res.body.warnings.length).toBe(1);
+    expect(res.body.warnings[0].policyName).toBe('no-secret');
+    expect(res.body.warnings[0].overriddenByRole).toBe('cto'); // Ancestor (cto) overrides
+    expect(res.body.warnings[0].originalRole).toBe('junior');   // Subordinate (junior) was overridden
+    // Ancestor's policy should dominate
+    expect(res.body.policies.length).toBe(1);
+    expect(res.body.policies[0].name).toBe('no-secret');
+    expect(res.body.policies[0].rule).toBe('No secrets'); // CTO's rule
+    expect(res.body.policies[0].setByRole).toBe('cto');
   });
 });

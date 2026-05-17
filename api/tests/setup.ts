@@ -17,10 +17,12 @@ beforeAll(async () => {
     .map((name) => `"public"."${name}"`)
     .join(', ');
 
-  try {
-    await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${tables} CASCADE;`);
-  } catch (error) {
-    console.log({ error });
+  if (tables.length > 0) {
+    try {
+      await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${tables} CASCADE;`);
+    } catch (error) {
+      console.log({ error });
+    }
   }
 });
 
