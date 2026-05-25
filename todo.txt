@@ -1,0 +1,9 @@
+1. have devs upload their own skills, but organization is dominant one
+2. have testing features for testers to upgrade policy
+3. devs can create their own skills and share and others can modify them according to their own stuff
+4. have a mechanism to test conflict.
+5. have a marketplace like site for devs to opt in for.
+6. have extensive user management
+7. modify this to be sold to creative industry
+8. make company site for displaying things
+

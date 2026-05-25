@@ -1,0 +1,107 @@
+{
+  "hierarchy": [
+    {
+      "role": "cto",
+      "displayName": "CTO / Security",
+      "policies": [
+        {
+          "id": "no-hardcoded-secrets",
+          "rule": "Never hardcode secrets, API keys, or credentials in source code.",
+          "skill": "If you need a secret or API key, always read it from process.env.YOUR_KEY_NAME. Never assign a string literal to a variable named key, secret, password, token, api_key, or credential.",
+          "evaluator": {
+            "type": "regex",
+            "pattern": "(api_key|secret|password|token|apikey|api_secret|pass)\\s*=\\s*['\"][^'\"]{8,}['\"]",
+            "flags": "i"
+          },
+          "fix_suggestion": "Move the value to a .env file and read it with process.env.YOUR_KEY_NAME.",
+          "severity": "error"
+        },
+        {
+          "id": "require-unit-tests",
+          "rule": "Every function that modifies data must have at least one unit test.",
+          "skill": "After writing any function that creates, updates, or deletes data, always write a corresponding test file with at least one test case covering the happy path.",
+          "evaluator": {
+            "type": "none"
+          },
+          "fix_suggestion": "Add a test file alongside this function before committing.",
+          "severity": "warning"
+        },
+        {
+          "id": "approved-packages-only",
+          "rule": "Only use libraries from the approved list: lodash, axios, zod, express, pg, prisma.",
+          "skill": "Before installing any package, check if it is in the approved list: lodash, axios, zod, express, pg, prisma. Dev dependencies (@types/*, jest, ts-jest, typescript, ts-node, nodemon) are always permitted.",
+          "evaluator": {
+            "type": "command",
+            "pattern": "npm\\s+(install|i|add)|yarn\\s+(add)|pnpm\\s+(add)"
+          },
+          "fix_suggestion": "Request approval for this package from your engineering lead before installing.",
+          "severity": "error"
+        },
+        {
+          "id": "no-force-push",
+          "rule": "Do not use git push --force or --force-with-lease.",
+          "skill": "Never use git push --force or --force-with-lease. If you need to update a remote branch, use git push and resolve conflicts properly.",
+          "evaluator": {
+            "type": "command",
+            "pattern": "git push.*(--force(-with-lease)?|-f\\b)"
+          },
+          "fix_suggestion": "Use git pull --rebase then git push and resolve any conflicts manually.",
+          "severity": "error"
+        }
+      ]
+    },
+    {
+      "role": "lead",
+      "displayName": "Engineering Lead",
+      "inheritsFrom": "cto",
+      "policies": [
+        {
+          "id": "jsdoc-required",
+          "rule": "All public-facing functions must have JSDoc comments.",
+          "skill": "Before writing any exported function, always add a JSDoc comment block above it describing what it does, its parameters, and return value.",
+          "evaluator": {
+            "type": "none"
+          },
+          "fix_suggestion": "Add a JSDoc comment block above this function.",
+          "severity": "warning"
+        },
+        {
+          "id": "no-console-log",
+          "rule": "Do not use console.log in production code — use the internal logger.",
+          "skill": "Never use console.log(), console.warn(), or console.error() directly. Always import the logger and use logger.info(), logger.warn(), or logger.error() instead.",
+          "evaluator": {
+            "type": "regex",
+            "pattern": "console\\.(log|warn|error|info)\\s*\\(",
+            "flags": ""
+          },
+          "fix_suggestion": "Replace console.log with logger.info (import logger from './logger').",
+          "severity": "error"
+        }
+      ]
+    },
+    {
+      "role": "senior",
+      "displayName": "Senior Developer",
+      "inheritsFrom": "lead",
+      "policies": [
+        {
+          "id": "adr-comment-required",
+          "rule": "All new modules must include an architecture decision record (ADR) comment at the top of the file.",
+          "skill": "When creating a new file, always start it with a comment block explaining why this module exists, what problem it solves, and any key decisions made in its design.",
+          "evaluator": {
+            "type": "none"
+          },
+          "fix_suggestion": "Add an ADR comment block at the top of this file.",
+          "severity": "warning"
+        }
+      ]
+    },
+    {
+      "role": "junior",
+      "displayName": "Junior Developer",
+      "inheritsFrom": "lead",
+      "policies": []
+    }
+  ],
+  "currentUserRole": "junior"
+}

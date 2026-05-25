@@ -28,6 +28,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Build @comply/core
+        run: cd packages/core && npm run build
       - name: Generate Prisma client
         run: cd api && npx prisma generate
       - name: Build
@@ -40,6 +42,8 @@ jobs:
   test-mcp:
     name: MCP — Build & Test
     runs-on: ubuntu-latest
+    env:
+      COMPLY_API_KEY: ""   # Explicit empty — exercises standalone mode only in CI
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -107,6 +111,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Railway CLI
         run: npm install -g @railway/cli
+      - name: Prepare build context
+        run: |
+          cp -r packages/core api/packages/core
+          cd api/packages/core && npm install && npm run build
       - name: Deploy API
         run: |
           railway up \
@@ -116,33 +124,6 @@ jobs:
             --detach \
             --path-as-root \
             api/
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-
-  deploy-mcp:
-    name: Deploy MCP to Railway
-    runs-on: ubuntu-latest
-    needs: [test-mcp]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-      - name: Copy workspace dependencies
-        run: |
-          mkdir -p mcp/packages
-          cp -r packages/core mcp/packages/core
-          cd mcp/packages/core && npm install && npm run build
-        working-directory: ${{ github.workspace }}
-      - name: Deploy MCP
-        run: |
-          railway up \
-            --service orgai-mcp \
-            --project ${{ secrets.RAILWAY_PROJECT_ID }} \
-            --environment production \
-            --detach \
-            --path-as-root \
-            mcp/
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 

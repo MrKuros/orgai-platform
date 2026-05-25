@@ -14,7 +14,9 @@ import { resolveRouter } from './routes/resolve';
 import { auditRouter } from './routes/audit';
 import { webhooksRouter } from './routes/webhooks';
 import { ssoRouter } from './routes/sso';
+import { setupRouter } from './routes/setup';
 import { logger } from './lib/logger';
+import { mountMcpRoutes } from './mcp/routes';
 
 const app = express();
 
@@ -33,6 +35,9 @@ app.use(cors({
 app.use(compression());
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
+
+// MCP SSE transport (must be after body parsing middleware)
+mountMcpRoutes(app);
 
 // Rate limiting
 app.use('/v1', rateLimit({
@@ -56,6 +61,7 @@ app.use('/v1/orgs', resolveRouter);
 app.use('/v1/orgs', auditRouter);
 app.use('/v1/orgs', webhooksRouter);
 app.use('/v1/orgs', ssoRouter);
+app.use('/', setupRouter);
 
 // Global error handler
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

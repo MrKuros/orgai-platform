@@ -1,7 +1,9 @@
+type OrgInfo = { orgId: string; orgName: string; orgSlug: string; keyName: string; scopes: string[] };
+
 export class OrgAIClient {
   private apiUrl: string;
   private apiKey: string;
-  private orgCache: { orgId: string, orgName: string, orgSlug: string, keyName: string, scopes: string[] } | null = null;
+  private orgCache: OrgInfo | null = null;
 
   constructor(apiKey?: string, apiUrl?: string) {
     this.apiKey = apiKey || process.env.COMPLY_API_KEY || '';
@@ -32,8 +34,8 @@ export class OrgAIClient {
   async getOrgFromApiKey() {
     if (this.orgCache) return this.orgCache;
     const data = await this.request('/v1/auth/me/api');
-    this.orgCache = data;
-    return data;
+    this.orgCache = data as OrgInfo;
+    return this.orgCache;
   }
 
   async listRoles(orgId: string) {

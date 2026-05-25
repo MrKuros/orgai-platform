@@ -1,5 +1,11 @@
 # OrgAI Platform
 
+> **Landing page:** `landing-page/index.html` — open directly in a browser
+>
+> **Project code:** start at `index.html` or browse `dashboard/`, `api/`, `extension/`, `mcp/`
+
+---
+
 Org-wide AI compliance enforcement for developer teams.
 Enforce coding policies across every AI agent your team uses — Claude Code, Cursor, Copilot, and more.
 
@@ -30,15 +36,18 @@ cp .env.example .env
 docker-compose up
 # API: http://localhost:8080
 # Dashboard: http://localhost:3000
-# MCP: http://localhost:3001
+# MCP: http://localhost:8080/mcp/sse
 ```
 
 ## Manual setup (without Docker)
 
 ```bash
+# ⚠️ Always build core first — mcp/ and extension/ depend on packages/core/dist/
+cd packages/core && npm run build
+cd ../
+
 cd api && npm install && npx prisma migrate dev && npm run dev
 cd dashboard && npm install && npm run dev
-cd mcp && npm install && npm run build && npm run start:http
 ```
 
 ## Connect the VS Code extension
@@ -49,13 +58,19 @@ cd mcp && npm install && npm run build && npm run start:http
 
 ## Connect any MCP agent (Cursor, Claude Code, etc.)
 
+### Quick setup (recommended)
+```bash
+curl -fsSL https://api.orgai.dev/setup.sh | bash -s -- --key YOUR_API_KEY
+```
+
+### Manual configuration
 ```json
 {
   "mcpServers": {
     "orgai": {
-      "url": "https://mcp.orgai.dev/sse",
+      "url": "https://api.orgai.dev/mcp/sse",
       "env": {
-        "COMPLY_API_KEY": "oai_your_key_here"
+        "ORGAI_API_KEY": "oai_your_key_here"
       }
     }
   }
@@ -64,7 +79,7 @@ cd mcp && npm install && npm run build && npm run start:http
 
 ## Deploy
 
-- **API + MCP**: Railway (see `api/railway.json`, `mcp/railway.json`)
+- **API (includes MCP)**: Railway (see `api/railway.json`)
 - **Dashboard**: Vercel (see `dashboard/vercel.json`)
 - Set GitHub secrets: `RAILWAY_TOKEN`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `DATABASE_URL_TEST`
 

@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'IDE Setup', href: '/ide-setup', icon: Code2 },
   { name: 'Roles', href: '/roles', icon: GitBranch },
   { name: 'Policies', href: '/policies', icon: Shield },
   { name: 'Team', href: '/team', icon: Users },
