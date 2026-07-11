@@ -7,8 +7,11 @@ export class OrgAIClient {
 
   constructor(apiKey?: string, apiUrl?: string) {
     this.apiKey = apiKey || process.env.COMPLY_API_KEY || '';
-    // Default to localhost for internal calls when running in merged mode
-    this.apiUrl = apiUrl || process.env.ORGAI_API_URL || 'http://localhost:8080';
+    // Merged mode calls back into this same process, so bind to the actual
+    // listening port rather than assuming 8080 (Render/other hosts set PORT)
+    this.apiUrl = apiUrl
+      || process.env.ORGAI_API_URL
+      || `http://localhost:${process.env.PORT || 8080}`;
   }
 
   private async request(endpoint: string, options: RequestInit = {}): Promise<any> {

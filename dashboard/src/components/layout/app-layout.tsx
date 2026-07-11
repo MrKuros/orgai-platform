@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { Sidebar } from './sidebar';
 import { Spinner } from '@/components/ui/spinner';
+import { ViolationFeed } from '@/components/violation-feed';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -30,6 +31,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 overflow-y-auto">
         {children}
       </main>
+      <ViolationFeed />
     </div>
   );
 }

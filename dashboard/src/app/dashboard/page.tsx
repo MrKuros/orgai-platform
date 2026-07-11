@@ -37,7 +37,7 @@ export default function DashboardPage() {
   const policyCount = policiesData?.policies?.length;
   const roleCount = rolesData?.roles?.length;
   const memberCount = membersData?.members?.length;
-  const violationCount = auditData?.total;
+  const violationCount = auditData?.data?.length || 0;
 
   return (
     <AppLayout>

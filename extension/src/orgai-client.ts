@@ -48,6 +48,9 @@ export class OrgAIClient {
   async getOrgInfo(): Promise<OrgInfo> {
     if (this.orgInfoCache) return this.orgInfoCache;
     const result = await this.fetch<OrgInfo>('/v1/auth/me/api');
+    if (!result || !result.orgId) {
+      throw new Error('Invalid org info received from API');
+    }
     this.orgInfoCache = result;
     return result;
   }

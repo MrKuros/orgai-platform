@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
 import useSWR from 'swr';
-import { Plus, Trash2, Pencil, Shield, ArrowRight, ShieldCheck, Search } from 'lucide-react';
+import { Plus, Trash2, Pencil, Shield, ArrowRight, ShieldCheck, Search, Play } from 'lucide-react';
 
 import { useAuth } from '@/lib/auth';
 import { fetcher, createPolicy, updatePolicy, deletePolicy, ApiError } from '@/lib/api';
@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { PolicyForm, PolicyFormValues } from '@/components/policy-form';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { LiveEvaluatorPreview } from '@/components/live-evaluator-preview';
 
 export default function PoliciesPage() {
   const { currentOrg } = useAuth();
@@ -41,6 +42,9 @@ export default function PoliciesPage() {
   const [policyToDelete, setPolicyToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Live Evaluator Preview
+  const [isEvaluatorOpen, setIsEvaluatorOpen] = useState(false);
 
   const filteredPolicies = policies.filter((p: any) => 
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -95,10 +99,19 @@ export default function PoliciesPage() {
   return (
     <AppLayout>
       <div className="container mx-auto p-6 max-w-6xl">
-        <PageHeader 
-          title="Policies" 
+        <PageHeader
+          title="Policies"
           description="Define rules for AI agents and bind them to specific roles."
-          action={<Button onClick={() => setIsCreateOpen(true)}><Plus className="w-4 h-4 mr-2" /> New Policy</Button>}
+          action={
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setIsEvaluatorOpen(true)}>
+                <Play className="w-4 h-4 mr-2" /> Evaluate
+              </Button>
+              <Button onClick={() => setIsCreateOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" /> New Policy
+              </Button>
+            </div>
+          }
         />
 
         {isLoading ? (
@@ -251,6 +264,12 @@ export default function PoliciesPage() {
         onConfirm={handleDeleteConfirm}
         isLoading={isDeleting}
         destructive
+      />
+
+      {/* Live Evaluator Preview */}
+      <LiveEvaluatorPreview
+        open={isEvaluatorOpen}
+        onOpenChange={setIsEvaluatorOpen}
       />
     </AppLayout>
   );

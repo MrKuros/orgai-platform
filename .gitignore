@@ -15,3 +15,8 @@ extension/*.vsix
 dashboard/.next/
 docker-compose.override.yml
 .logs/
+
+# build/test artifacts
+*.tsbuildinfo
+dashboard/playwright-report/
+.od-skills/

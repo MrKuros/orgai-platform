@@ -1,3 +1,4 @@
+import { AppError } from "../lib/AppError";
 import { Router } from 'express';
 import { z } from 'zod';
 import { validate } from '../middleware/validate';
@@ -6,10 +7,24 @@ import { requireApiKey } from '../middleware/auth';
 import { authOrApiKey } from '../middleware/authOrApiKey';
 import { writeAuditLog } from '../services/audit';
 import { dispatchWebhook } from '../services/webhook';
+import { broadcastViolation } from './violations';
+import { meterEvaluation } from '../lib/plans';
 
 export const resolveRouter = Router();
 
 const cache = new Map<string, { data: any, expires: number }>();
+
+export function invalidateResolveCache(orgId?: string) {
+  if (orgId) {
+    for (const key of cache.keys()) {
+      if (key.startsWith(`${orgId}:`)) {
+        cache.delete(key);
+      }
+    }
+  } else {
+    cache.clear();
+  }
+}
 
 export async function resolveRolePolicies(orgId: string, roleName: string) {
   const cacheKey = `${orgId}:${roleName}`;
@@ -37,7 +52,10 @@ export async function resolveRolePolicies(orgId: string, roleName: string) {
     include: { bindings: { include: { policy: true } } }
   });
 
+  const visitedRoleIds = new Set<string>();
   while (currentRoleId) {
+    if (visitedRoleIds.has(currentRoleId)) break; // Prevent infinite loop from cyclic data
+    visitedRoleIds.add(currentRoleId);
     const currentRole = allRoles.find(r => r.id === currentRoleId);
     if (!currentRole) break;
 
@@ -48,7 +66,6 @@ export async function resolveRolePolicies(orgId: string, roleName: string) {
       const existingPolicy = policyMap.get(policyName);
 
       if (existingPolicy) {
-        // Ancestor policy dominates - subordinate policy was overridden
         warnings.push({
           policyName,
           overriddenByRole: currentRole.name,
@@ -56,7 +73,6 @@ export async function resolveRolePolicies(orgId: string, roleName: string) {
         });
       }
 
-      // Always set/update the policy (ancestor dominates)
       policyMap.set(policyName, {
         ...binding.policy,
         setByRole: currentRole.name,
@@ -69,7 +85,7 @@ export async function resolveRolePolicies(orgId: string, roleName: string) {
 
   const responseData = {
     role: { id: role.id, name: role.name, displayName: role.displayName },
-    resolvedFrom: resolvedFrom.reverse(), // Root first
+    resolvedFrom: resolvedFrom.reverse(),
     policies: Array.from(policyMap.values()),
     warnings
   };
@@ -78,13 +94,40 @@ export async function resolveRolePolicies(orgId: string, roleName: string) {
   return responseData;
 }
 
+/**
+ * @swagger
+ * /v1/orgs/{orgId}/resolve/{roleName}:
+ *   get:
+ *     summary: Resolve policies for a role
+ *     tags: [Resolve]
+ *     security:
+ *       - bearerAuth: []
+ *       - apiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orgId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: path
+ *         name: roleName
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Resolved policies
+ *       404:
+ *         description: Role not found
+ */
 resolveRouter.get('/:orgId/resolve/:roleName', authOrApiKey, async (req, res) => {
   const { roleName, orgId } = req.params;
-  
+
   const responseData = await resolveRolePolicies(orgId, roleName);
-  
+
   if (!responseData) {
-    return res.status(404).json({ error: 'Role not found' });
+    throw new AppError(404, 'ERROR', 'Role not found');
   }
 
   res.json(responseData);
@@ -97,13 +140,64 @@ const checkSchema = z.object({
   roleName: z.string()
 });
 
+/**
+ * @swagger
+ * /v1/orgs/{orgId}/check:
+ *   post:
+ *     summary: Check content against policies
+ *     tags: [Resolve]
+ *     security:
+ *       - apiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orgId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [type, content, roleName]
+ *             properties:
+ *               type:
+ *                 type: string
+ *                 enum: [code, command]
+ *               content:
+ *                 type: string
+ *               filePath:
+ *                 type: string
+ *               roleName:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Policy check result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 passed:
+ *                   type: boolean
+ *                 violations:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Violation'
+ *       404:
+ *         description: Role not found
+ */
 resolveRouter.post('/:orgId/check', requireApiKey, validate(checkSchema), async (req, res) => {
   const { type, content, filePath, roleName } = req.body;
   const orgId = req.org!.id;
 
+  await meterEvaluation(orgId, req.org!.plan);
+
   const responseData = await resolveRolePolicies(orgId, roleName);
   if (!responseData) {
-    return res.status(404).json({ error: 'Role not found' });
+    throw new AppError(404, 'ERROR', 'Role not found');
   }
 
   const { policies } = responseData;
@@ -152,6 +246,7 @@ resolveRouter.post('/:orgId/check', requireApiKey, validate(checkSchema), async 
 
   if (hasErrors) {
     dispatchWebhook(orgId, 'policy.violated', { violations });
+    broadcastViolation(orgId, { violations, timestamp: new Date().toISOString() });
   }
 
   res.json({ passed: !hasErrors, violations });

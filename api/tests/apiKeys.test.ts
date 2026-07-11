@@ -45,6 +45,33 @@ describe('API Keys Routes', () => {
     expect(res.body.apiKeys[0]).not.toHaveProperty('keyHash');
   });
 
+  it('POST /v1/orgs/:orgId/api-keys -> 402 once the plan limit is reached', async () => {
+    // FREE plan allows 5 keys; two already exist from earlier tests
+    for (let i = 0; i < 3; i++) {
+      await request(app)
+        .post(`/v1/orgs/${orgId}/api-keys`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: `Filler Key ${i}` });
+    }
+
+    const res = await request(app)
+      .post(`/v1/orgs/${orgId}/api-keys`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Over Limit Key' });
+
+    expect(res.status).toBe(402);
+
+    // Free a slot so later tests are unaffected by the quota
+    const list = await request(app)
+      .get(`/v1/orgs/${orgId}/api-keys`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    for (const key of list.body.apiKeys.filter((k: any) => k.name.startsWith('Filler Key'))) {
+      await request(app)
+        .delete(`/v1/orgs/${orgId}/api-keys/${key.id}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+    }
+  });
+
   it('DELETE /v1/orgs/:orgId/api-keys/:keyId -> 204', async () => {
     const createRes = await request(app)
       .post(`/v1/orgs/${orgId}/api-keys`)

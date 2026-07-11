@@ -15,7 +15,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { CopyButton } from '@/components/copy-button';
 import { IdeSetupTabs } from '@/components/ide-setup-tabs';
 
-const MCP_URL = process.env.NEXT_PUBLIC_MCP_URL || 'https://mcp.orgai.dev';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.orgai.dev';
 
 export default function IdeSetupPage() {
   const { currentOrg } = useAuth();

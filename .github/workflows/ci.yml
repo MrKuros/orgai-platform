@@ -77,6 +77,63 @@ jobs:
       - name: Lint
         run: cd dashboard && npm run lint
 
+  test-dashboard-e2e:
+    name: Dashboard — E2E Tests
+    runs-on: ubuntu-latest
+    needs: [test-api]
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: orgai_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://test:test@localhost:5432/orgai_test
+      DIRECT_DATABASE_URL: postgresql://test:test@localhost:5432/orgai_test
+      JWT_SECRET: test-jwt-secret-for-ci-only
+      WORKOS_API_KEY: placeholder
+      WORKOS_CLIENT_ID: placeholder
+      WORKOS_REDIRECT_URI: http://localhost:8080/v1/auth/sso/callback
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+      E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+      E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build core
+        run: cd packages/core && npm run build
+      - name: Setup database
+        run: |
+          cd api
+          npx prisma generate
+          npx prisma migrate deploy
+      - name: Start API server
+        run: cd api && npm run dev &
+        env:
+          PORT: 8080
+      - name: Wait for API
+        run: |
+          for i in $(seq 1 30); do
+            curl -s http://localhost:8080/health && break || sleep 1
+          done
+      - name: Install Playwright Browsers
+        run: cd dashboard && npx playwright install --with-deps chromium
+      - name: Run E2E tests
+        run: cd dashboard && npm run test:e2e
+
   test-extension:
     name: Extension — Build & Test
     runs-on: ubuntu-latest
@@ -102,42 +159,12 @@ jobs:
         env:
           DISPLAY: ':99'
 
-  deploy-api:
-    name: Deploy API to Railway
-    runs-on: ubuntu-latest
-    needs: [test-api]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-      - name: Prepare build context
-        run: |
-          cp -r packages/core api/packages/core
-          cd api/packages/core && npm install && npm run build
-      - name: Deploy API
-        run: |
-          railway up \
-            --service orgai-api \
-            --project ${{ secrets.RAILWAY_PROJECT_ID }} \
-            --environment production \
-            --detach \
-            --path-as-root \
-            api/
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-
-  deploy-dashboard:
-    name: Deploy Dashboard to Vercel
-    runs-on: ubuntu-latest
-    needs: [test-dashboard]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Vercel CLI
-        run: npm install -g vercel
-      - name: Deploy Dashboard
-        run: vercel --prod --yes --token ${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+# Deployment is handled by the hosting platforms' native git integration,
+# not by this workflow:
+#   - API:       Render Blueprint (render.yaml) auto-builds on push to main.
+#                Migrations run at boot via the render.yaml dockerCommand.
+#                In Render, set "Auto-Deploy: After CI Checks Pass" to gate on the
+#                test jobs above. The hosted MCP endpoints ship inside this service.
+#   - Dashboard: Vercel GitHub app auto-builds the `dashboard/` root on push to main.
+# The old Railway (deploy-api) and Vercel CLI (deploy-dashboard) jobs were removed
+# when the project migrated off Railway. See DEPLOY.md for the full runbook.

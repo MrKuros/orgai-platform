@@ -8,6 +8,25 @@ import { writeAuditLog } from '../services/audit';
 
 export const webhooksRouter = Router();
 
+/**
+ * @swagger
+ * /v1/orgs/{orgId}/webhooks:
+ *   get:
+ *     summary: List webhooks
+ *     tags: [Webhooks]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orgId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: List of webhooks
+ */
 webhooksRouter.get('/:orgId/webhooks', requireAuth, requireOrgRole('ORG_ADMIN'), async (req, res) => {
   const webhooks = await prisma.webhook.findMany({
     where: { orgId: req.org!.id },
@@ -25,9 +44,44 @@ webhooksRouter.get('/:orgId/webhooks', requireAuth, requireOrgRole('ORG_ADMIN'),
 
 const createWebhookSchema = z.object({
   url: z.string().url(),
-  events: z.array(z.enum(['policy.violated', 'policy.updated', 'member.invited', 'audit.flagged'])).min(1)
+  events: z.array(z.enum(['policy.violated', 'policy.created', 'policy.updated', 'member.invited', 'audit.flagged'])).min(1)
 });
 
+/**
+ * @swagger
+ * /v1/orgs/{orgId}/webhooks:
+ *   post:
+ *     summary: Create a webhook
+ *     tags: [Webhooks]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orgId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [url, events]
+ *             properties:
+ *               url:
+ *                 type: string
+ *                 format: uri
+ *               events:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   enum: [policy.violated, policy.updated, member.invited, audit.flagged]
+ *     responses:
+ *       201:
+ *         description: Webhook created
+ */
 webhooksRouter.post('/:orgId/webhooks', requireAuth, requireOrgRole('ORG_ADMIN'), validate(createWebhookSchema), async (req, res) => {
   const { url, events } = req.body;
 
@@ -54,10 +108,51 @@ webhooksRouter.post('/:orgId/webhooks', requireAuth, requireOrgRole('ORG_ADMIN')
 
 const updateWebhookSchema = z.object({
   url: z.string().url().optional(),
-  events: z.array(z.enum(['policy.violated', 'policy.updated', 'member.invited', 'audit.flagged'])).min(1).optional(),
+  events: z.array(z.enum(['policy.violated', 'policy.created', 'policy.updated', 'member.invited', 'audit.flagged'])).min(1).optional(),
   active: z.boolean().optional()
 });
 
+/**
+ * @swagger
+ * /v1/orgs/{orgId}/webhooks/{webhookId}:
+ *   patch:
+ *     summary: Update a webhook
+ *     tags: [Webhooks]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orgId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: path
+ *         name: webhookId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               url:
+ *                 type: string
+ *                 format: uri
+ *               events:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   enum: [policy.violated, policy.updated, member.invited, audit.flagged]
+ *               active:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Webhook updated
+ */
 webhooksRouter.patch('/:orgId/webhooks/:webhookId', requireAuth, requireOrgRole('ORG_ADMIN'), validate(updateWebhookSchema), async (req, res) => {
   const { webhookId } = req.params;
 
@@ -77,6 +172,31 @@ webhooksRouter.patch('/:orgId/webhooks/:webhookId', requireAuth, requireOrgRole(
   res.json({ webhook });
 });
 
+/**
+ * @swagger
+ * /v1/orgs/{orgId}/webhooks/{webhookId}:
+ *   delete:
+ *     summary: Delete a webhook
+ *     tags: [Webhooks]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orgId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: path
+ *         name: webhookId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       204:
+ *         description: Webhook deleted
+ */
 webhooksRouter.delete('/:orgId/webhooks/:webhookId', requireAuth, requireOrgRole('ORG_ADMIN'), async (req, res) => {
   const { webhookId } = req.params;
 

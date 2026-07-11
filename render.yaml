@@ -1,0 +1,41 @@
+# Render Blueprint — deploys the OrgAI API (which also serves the MCP
+# endpoints at /mcp/*, so no separate MCP service is needed).
+# Dashboard deploys to Vercel; database lives on Neon.
+services:
+  - type: web
+    name: orgai-api
+    runtime: docker
+    rootDir: api
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    # Free tier has no pre-deploy hook, so run migrations at boot
+    dockerCommand: sh -c "npx prisma migrate deploy && node dist/index.js"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "8080"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false # paste Neon pooled connection string in dashboard
+      - key: DIRECT_DATABASE_URL
+        sync: false # paste Neon direct (non-pooled) connection string
+      - key: CORS_ORIGIN
+        value: https://app.orgai.dev
+      - key: DASHBOARD_URL
+        value: https://app.orgai.dev
+      - key: ORGAI_API_URL
+        value: https://api.orgai.dev
+      - key: EMAIL_FROM
+        value: OrgAI <noreply@orgai.dev>
+      - key: RESEND_API_KEY
+        sync: false # from resend.com — optional, emails log-only without it
+      # WorkOS SSO is optional; leave unset until an enterprise customer needs it
+      # - key: WORKOS_API_KEY
+      #   sync: false
+      # - key: WORKOS_CLIENT_ID
+      #   sync: false
+      # - key: WORKOS_REDIRECT_URI
+      #   value: https://api.orgai.dev/v1/auth/sso/callback

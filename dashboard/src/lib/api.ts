@@ -3,7 +3,8 @@ import {
   Organization, Role, CreateRoleInput, UpdateRoleInput,
   Policy, CreatePolicyInput, UpdatePolicyInput,
   Membership, InviteMemberInput, UpdateMemberInput,
-  ApiKey, CreateApiKeyInput, AuditLogEntry
+  ApiKey, CreateApiKeyInput, AuditLogEntry,
+  SsoConfig, PolicyVersion
 } from './types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -48,7 +49,7 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
     let data;
     try {
       data = await response.json();
-      message = data.error || message;
+      message = data?.error?.message || data?.error || data?.message || message;
     } catch (e) {
       // Not JSON
     }
@@ -69,6 +70,14 @@ export async function signup(data: SignupInput): Promise<AuthResponse> {
 
 export async function login(data: LoginInput): Promise<AuthResponse> {
   return fetchApi<AuthResponse>('/auth/login', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function forgotPassword(data: { email: string }): Promise<{ message: string }> {
+  return fetchApi<{ message: string }>('/auth/forgot-password', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function resetPassword(data: { token: string; password: string }): Promise<AuthResponse> {
+  return fetchApi<AuthResponse>('/auth/reset-password', { method: 'POST', body: JSON.stringify(data) });
 }
 
 export async function getMe(): Promise<MeResponse> {
@@ -153,16 +162,44 @@ export async function deleteApiKey(orgId: string, keyId: string): Promise<void> 
 }
 
 // Audit Log
-export async function getAuditLog(orgId: string, params?: { page?: number, limit?: number, action?: string }): Promise<{ data: AuditLogEntry[], total: number, page: number, limit: number, totalPages: number }> {
+export async function getAuditLog(orgId: string, params?: { cursor?: string; limit?: number; action?: string }): Promise<{ data: AuditLogEntry[], nextCursor?: string, hasMore: boolean }> {
   const query = new URLSearchParams();
-  if (params?.page) query.append('page', params.page.toString());
+  if (params?.cursor) query.append('cursor', params.cursor);
   if (params?.limit) query.append('limit', params.limit.toString());
   if (params?.action) query.append('action', params.action);
-  
+
   const queryString = query.toString() ? `?${query.toString()}` : '';
-  return fetchApi<{ data: AuditLogEntry[], total: number, page: number, limit: number, totalPages: number }>(`/orgs/${orgId}/audit${queryString}`);
+  return fetchApi<{ data: AuditLogEntry[], nextCursor?: string, hasMore: boolean }>(`/orgs/${orgId}/audit${queryString}`);
 }
 
 export const fetcher = async (url: string) => {
   return fetchApi(url);
 };
+
+// SSO
+export async function getSsoConfig(orgId: string): Promise<{ ssoConfig: SsoConfig | null }> {
+  return fetchApi<{ ssoConfig: SsoConfig | null }>(`/orgs/${orgId}/sso`);
+}
+
+export async function saveSsoConfig(orgId: string, data: { provider: string; workosOrgId: string; connectionId: string }): Promise<{ ssoConfig: SsoConfig }> {
+  return fetchApi<{ ssoConfig: SsoConfig }>(`/orgs/${orgId}/sso`, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+export async function testSsoConnection(orgId: string): Promise<{ success: boolean; error?: string }> {
+  return fetchApi<{ success: boolean; error?: string }>(`/orgs/${orgId}/sso/test`, { method: 'POST' });
+}
+
+// Policy Check
+export async function checkPolicy(orgId: string, data: { type: 'code' | 'command'; content: string; roleName: string; filePath?: string }): Promise<{ passed: boolean; violations: any[] }> {
+  return fetchApi<{ passed: boolean; violations: any[] }>(`/orgs/${orgId}/check`, { method: 'POST', body: JSON.stringify(data) });
+}
+
+// Policy Versions
+export async function getPolicyVersions(orgId: string, policyId: string): Promise<{ versions: PolicyVersion[] }> {
+  return fetchApi<{ versions: PolicyVersion[] }>(`/orgs/${orgId}/policies/${policyId}/versions`);
+}
+
+// Policy Rollback
+export async function rollbackPolicy(orgId: string, policyId: string, versionId: string): Promise<{ policy: Policy }> {
+  return fetchApi<{ policy: Policy }>(`/orgs/${orgId}/policies/${policyId}/rollback/${versionId}`, { method: 'POST' });
+}

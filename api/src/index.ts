@@ -1,9 +1,12 @@
+import 'express-async-errors';
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
-import rateLimit from 'express-rate-limit';
+import swaggerUi from 'swagger-ui-express';
+import { globalRateLimit, authRateLimit, apiKeyRateLimit } from './middleware/rateLimit';
+import { errorHandler } from './middleware/errorHandler';
 import { authRouter } from './routes/auth';
 import { orgsRouter } from './routes/orgs';
 import { rolesRouter } from './routes/roles';
@@ -15,8 +18,10 @@ import { auditRouter } from './routes/audit';
 import { webhooksRouter } from './routes/webhooks';
 import { ssoRouter } from './routes/sso';
 import { setupRouter } from './routes/setup';
+import { violationsFeedRouter } from './routes/violations';
 import { logger } from './lib/logger';
 import { mountMcpRoutes } from './mcp/routes';
+import { swaggerSpec } from './swagger';
 
 const app = express();
 
@@ -40,15 +45,25 @@ app.use(cookieParser());
 mountMcpRoutes(app);
 
 // Rate limiting
-app.use('/v1', rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10000,
-  message: { error: 'Too many requests, please try again later.' }
-}));
+// Auth and API key endpoints get their own stricter limits (skip global).
+// Global limit covers everything else under /v1.
+app.use('/v1/auth', authRateLimit);
+app.use('/v1/orgs/:orgId/api-keys', apiKeyRateLimit);
+app.use('/v1', (req, res, next) => {
+  // Skip global rate limit for paths already covered by stricter limiters
+  if (req.path.startsWith('/auth') || req.path.match(/\/orgs\/[^/]+\/api-keys/)) {
+    return next();
+  }
+  return globalRateLimit(req, res, next);
+});
 
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 app.get('/', (req, res) => res.json({ status: 'ok' }));
+
+// Swagger docs
+app.get('/v1/docs/openapi.json', (req, res) => res.json(swaggerSpec));
+app.use('/v1/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customCss: '.swagger-ui .topbar { display: none }' }));
 
 // Routes
 app.use('/v1/auth', authRouter);
@@ -61,13 +76,11 @@ app.use('/v1/orgs', resolveRouter);
 app.use('/v1/orgs', auditRouter);
 app.use('/v1/orgs', webhooksRouter);
 app.use('/v1/orgs', ssoRouter);
+app.use('/v1/orgs', violationsFeedRouter);
 app.use('/', setupRouter);
 
 // Global error handler
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  logger.error(err.message, { stack: err.stack });
-  res.status(500).json({ error: 'Internal server error' });
-});
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 80;
 

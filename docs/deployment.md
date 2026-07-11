@@ -9,6 +9,8 @@
 
 ## 1. Deploy the API to Railway
 
+The API server now includes the MCP SSE transport at `/mcp/sse`.
+
 ### Create Railway project
 1. Go to railway.app → New Project → Deploy from GitHub
 2. Select `orgai-platform` repo
@@ -30,18 +32,7 @@ PORT=8080
 Railway service → Settings → Custom Domain → `api.orgai.dev`
 In Cloudflare DNS: add CNAME `api` → Railway URL
 
-## 2. Deploy MCP to Railway
-
-1. In same Railway project → New Service → Deploy from GitHub
-2. Set root directory to `mcp/`
-3. Set environment variables:
-PORT=3001
-COMPLY_API_URL=https://api.orgai.dev
-NODE_ENV=production
-4. Custom domain: `mcp.orgai.dev`
-In Cloudflare DNS: add CNAME `mcp` → Railway MCP service URL
-
-## 3. Deploy Dashboard to Vercel
+## 2. Deploy Dashboard to Vercel
 
 1. Go to vercel.com → New Project → Import `orgai-platform`
 2. Set root directory to `dashboard/`
@@ -50,7 +41,7 @@ NEXT_PUBLIC_API_URL=https://api.orgai.dev
 4. Custom domain: `app.orgai.dev`
 In Cloudflare DNS: add CNAME `app` → `cname.vercel-dns.com`
 
-## 4. Set GitHub Actions secrets
+## 3. Set GitHub Actions secrets
 
 Go to GitHub → orgai-platform repo → Settings → Secrets → Actions:
 
@@ -62,15 +53,14 @@ Go to GitHub → orgai-platform repo → Settings → Secrets → Actions:
 | `VERCEL_PROJECT_ID` | Vercel → Project → Settings → General |
 | `DATABASE_URL_TEST` | Neon → create second database `orgai-test` |
 
-## 5. DNS Summary (Cloudflare)
+## 4. DNS Summary (Cloudflare)
 
 | Subdomain | Type | Target |
 |-----------|------|--------|
 | `api.orgai.dev` | CNAME | Railway API service URL |
 | `app.orgai.dev` | CNAME | `cname.vercel-dns.com` |
-| `mcp.orgai.dev` | CNAME | Railway MCP service URL |
 
-## 6. Seed production database
+## 5. Seed production database
 
 After first deploy:
 ```bash

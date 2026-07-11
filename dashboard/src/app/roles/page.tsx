@@ -78,6 +78,7 @@ export default function RolesPage() {
         name: role.name,
         displayName: role.displayName,
         policyCount: role.bindings?.length || 0,
+        memberCount: role.memberships?.length || 0,
         isSelected: role.id === selectedRoleId,
       },
       position: { x: 0, y: 0 },
@@ -157,7 +158,7 @@ export default function RolesPage() {
             />
           </div>
         ) : (
-          <div className="flex-1 relative border-t bg-muted/10">
+          <div className="flex-1 relative border-t bg-muted/10 overflow-auto">
             <ReactFlow
               nodes={nodes}
               edges={edges}
@@ -166,6 +167,8 @@ export default function RolesPage() {
               onPaneClick={handlePaneClick}
               fitView
               attributionPosition="bottom-left"
+              minZoom={0.1}
+              maxZoom={2}
             >
               <Background color="hsl(var(--muted-foreground))" gap={16} size={1} />
               <Controls />

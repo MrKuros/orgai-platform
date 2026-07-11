@@ -55,6 +55,7 @@ export interface Policy {
   evaluatorFlags: string | null;
   fixSuggestion: string;
   severity: PolicySeverity;
+  currentVersion: number;
   createdAt: string;
   updatedAt: string;
   bindings?: PolicyBinding[];
@@ -161,4 +162,30 @@ export interface AuthResponse {
 
 export interface MeResponse {
   user: User;
+}
+
+export interface SsoConfig {
+  id: string;
+  provider: string;
+  workosOrgId?: string;
+  connectionId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PolicyVersion {
+  id: string;
+  policyId: string;
+  version: number;
+  name: string;
+  rule: string;
+  skill: string;
+  evaluatorType: string;
+  evaluatorPattern: string | null;
+  evaluatorFlags: string | null;
+  fixSuggestion: string;
+  severity: PolicySeverity;
+  changedById: string | null;
+  changedBy?: { id: string; email: string; firstName?: string; lastName?: string } | null;
+  createdAt: string;
 }

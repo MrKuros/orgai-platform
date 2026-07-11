@@ -3,7 +3,25 @@ import { createServer } from "./server";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { OrgAIClient } from "./api-client";
 
+import cors from 'cors';
+
 const app = express();
+
+const allowedOrigins = process.env.COMPLY_CORS_ORIGINS
+  ? process.env.COMPLY_CORS_ORIGINS.split(',').map(o => o.trim())
+  : ['http://localhost:3000'];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
+  credentials: true
+}));
+
 app.use(express.json());
 
 const transports: Record<string, SSEServerTransport> = {};

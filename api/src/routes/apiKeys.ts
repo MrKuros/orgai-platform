@@ -5,9 +5,29 @@ import { validate } from '../middleware/validate';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireOrgRole } from '../middleware/auth';
 import { writeAuditLog } from '../services/audit';
+import { assertWithinLimit, limitsFor } from '../lib/plans';
 
 export const apiKeysRouter = Router();
 
+/**
+ * @swagger
+ * /v1/orgs/{orgId}/api-keys:
+ *   get:
+ *     summary: List API keys
+ *     tags: [API Keys]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orgId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: List of API keys
+ */
 apiKeysRouter.get('/:orgId/api-keys', requireAuth, requireOrgRole('ORG_ADMIN'), async (req, res) => {
   const keys = await prisma.apiKey.findMany({
     where: { orgId: req.org!.id },
@@ -30,8 +50,57 @@ const createKeySchema = z.object({
   expiresAt: z.string().datetime().optional()
 });
 
+/**
+ * @swagger
+ * /v1/orgs/{orgId}/api-keys:
+ *   post:
+ *     summary: Create a new API key
+ *     tags: [API Keys]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orgId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name]
+ *             properties:
+ *               name:
+ *                 type: string
+ *               scopes:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               expiresAt:
+ *                 type: string
+ *                 format: date-time
+ *     responses:
+ *       201:
+ *         description: API key created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 apiKey:
+ *                   type: object
+ *                 key:
+ *                   type: string
+ *                   description: The raw API key (only shown once)
+ */
 apiKeysRouter.post('/:orgId/api-keys', requireAuth, requireOrgRole('ORG_ADMIN'), validate(createKeySchema), async (req, res) => {
   const { name, scopes, expiresAt } = req.body;
+
+  const keyCount = await prisma.apiKey.count({ where: { orgId: req.org!.id } });
+  assertWithinLimit(keyCount, limitsFor(req.org!.plan).apiKeys, 'API key', req.org!.plan);
 
   const rawKey = `oai_${crypto.randomBytes(32).toString('hex')}`;
   const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex');
@@ -70,6 +139,31 @@ apiKeysRouter.post('/:orgId/api-keys', requireAuth, requireOrgRole('ORG_ADMIN'),
   });
 });
 
+/**
+ * @swagger
+ * /v1/orgs/{orgId}/api-keys/{keyId}:
+ *   delete:
+ *     summary: Revoke an API key
+ *     tags: [API Keys]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orgId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: path
+ *         name: keyId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       204:
+ *         description: API key revoked
+ */
 apiKeysRouter.delete('/:orgId/api-keys/:keyId', requireAuth, requireOrgRole('ORG_ADMIN'), async (req, res) => {
   const { keyId } = req.params;
 

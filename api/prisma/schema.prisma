@@ -13,6 +13,7 @@ model Organization {
   id          String   @id @default(uuid())
   name        String
   slug        String   @unique
+  plan        Plan     @default(FREE)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -23,6 +24,44 @@ model Organization {
   auditLogs   AuditLog[]
   webhooks    Webhook[]
   ssoConfig   SsoConfig?
+  usage       UsageCounter[]
+}
+
+enum Plan {
+  FREE
+  TEAM
+  ENTERPRISE
+}
+
+model UsageCounter {
+  id          String       @id @default(uuid())
+  orgId       String
+  period      String // "YYYY-MM"
+  evaluations Int          @default(0)
+
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, period])
+}
+
+model AuthToken {
+  id        String        @id @default(uuid())
+  userId    String
+  tokenHash String        @unique
+  type      AuthTokenType
+  orgId     String? // org context for invites
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime      @default(now())
+
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+}
+
+enum AuthTokenType {
+  INVITE
+  PASSWORD_RESET
 }
 
 model User {
@@ -38,6 +77,8 @@ model User {
   memberships   Membership[]
   apiKeys       ApiKey[]
   auditLogs     AuditLog[]
+  policyVersions PolicyVersion[]
+  authTokens    AuthToken[]
 }
 
 model Membership {
@@ -91,11 +132,13 @@ model Policy {
   evaluatorFlags String?
   fixSuggestion  String         @default("")
   severity       PolicySeverity @default(ERROR)
+  currentVersion Int           @default(1)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
   org            Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
   bindings       PolicyBinding[]
+  versions       PolicyVersion[]
 }
 
 enum PolicySeverity {
@@ -113,6 +156,27 @@ model PolicyBinding {
   policy     Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
 
   @@unique([roleId, policyId])
+}
+
+model PolicyVersion {
+  id               String         @id @default(uuid())
+  policyId         String
+  version          Int
+  name             String
+  rule             String
+  skill            String
+  evaluatorType    String
+  evaluatorPattern String?
+  evaluatorFlags   String?
+  fixSuggestion    String
+  severity         PolicySeverity
+  changedById      String?
+  createdAt        DateTime       @default(now())
+
+  policy           Policy         @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  changedBy        User?          @relation(fields: [changedById], references: [id])
+
+  @@unique([policyId, version])
 }
 
 model ApiKey {

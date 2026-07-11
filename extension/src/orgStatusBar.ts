@@ -33,6 +33,14 @@ export class OrgStatusBar {
     this.item.show();
   }
 
+  setOffline(): void {
+    this.item.text = `$(cloud-off) Comply`;
+    this.item.tooltip = 'Comply — offline mode (using cached policies)';
+    this.item.command = 'comply.reloadPolicies';
+    this.item.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+    this.item.show();
+  }
+
   dispose(): void {
     this.item.dispose();
   }

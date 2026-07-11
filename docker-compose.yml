@@ -33,21 +33,6 @@ services:
       - api
     restart: unless-stopped
 
-  mcp:
-    build:
-      context: .
-      dockerfile: mcp/Dockerfile
-    ports:
-      - "3001:3001"
-    environment:
-      - COMPLY_API_URL=http://api:8080
-      - COMPLY_API_KEY=${COMPLY_API_KEY}
-      - COMPLY_USER_ROLE=${COMPLY_USER_ROLE:-junior}
-      - PORT=3001
-    depends_on:
-      - api
-    restart: unless-stopped
-
   postgres:
     image: postgres:16-alpine
     ports:

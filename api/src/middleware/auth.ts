@@ -1,3 +1,4 @@
+import { AppError } from "../lib/AppError";
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import { verifyToken } from '../lib/jwt';
@@ -13,7 +14,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     }
 
     if (!token) {
-      return res.status(401).json({ error: 'Unauthorized: Missing token' });
+      throw new AppError(401, 'ERROR', 'Unauthorized: Missing token');
     }
 
     const payload = verifyToken(token);
@@ -22,7 +23,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     req.user = { id: payload.userId, email: payload.email } as any;
     next();
   } catch (err) {
-    return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+    if (err instanceof AppError) throw err;
+    throw new AppError(401, 'UNAUTHORIZED', 'Unauthorized: Invalid token');
   }
 }
 
@@ -30,7 +32,7 @@ export async function requireApiKey(req: Request, res: Response, next: NextFunct
   try {
     const key = req.headers['x-api-key'] as string;
     if (!key) {
-      return res.status(401).json({ error: 'Unauthorized: Missing API key' });
+      throw new AppError(401, 'ERROR', 'Unauthorized: Missing API key');
     }
 
     const keyHash = crypto.createHash('sha256').update(key).digest('hex');
@@ -41,11 +43,11 @@ export async function requireApiKey(req: Request, res: Response, next: NextFunct
     });
 
     if (!apiKeyRecord) {
-      return res.status(401).json({ error: 'Unauthorized: Invalid API key' });
+      throw new AppError(401, 'ERROR', 'Unauthorized: Invalid API key');
     }
 
     if (apiKeyRecord.expiresAt && apiKeyRecord.expiresAt < new Date()) {
-      return res.status(401).json({ error: 'Unauthorized: API key expired' });
+      throw new AppError(401, 'ERROR', 'Unauthorized: API key expired');
     }
 
     // Fire and forget updating lastUsedAt
@@ -58,7 +60,8 @@ export async function requireApiKey(req: Request, res: Response, next: NextFunct
     req.apiKeyRecord = apiKeyRecord;
     next();
   } catch (err) {
-    return res.status(401).json({ error: 'Unauthorized: API key error' });
+    if (err instanceof AppError) throw err;
+    throw new AppError(401, 'UNAUTHORIZED', 'Unauthorized: API key error');
   }
 }
 
@@ -70,12 +73,12 @@ export function requireOrgRole(...roles: MembershipRole[]) {
       }
 
       if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized: User context missing' });
+        throw new AppError(401, 'ERROR', 'Unauthorized: User context missing');
       }
 
       const orgId = req.params.orgId;
       if (!orgId) {
-        return res.status(400).json({ error: 'Bad Request: Missing orgId' });
+        throw new AppError(400, 'ERROR', 'Bad Request: Missing orgId');
       }
 
       const membership = await prisma.membership.findUnique({
@@ -84,18 +87,19 @@ export function requireOrgRole(...roles: MembershipRole[]) {
       });
 
       if (!membership) {
-        return res.status(403).json({ error: 'Forbidden: Not a member of this organization' });
+        throw new AppError(403, 'ERROR', 'Forbidden: Not a member of this organization');
       }
 
       if (roles.length > 0 && !roles.includes(membership.role)) {
-        return res.status(403).json({ error: 'Forbidden: Insufficient role' });
+        throw new AppError(403, 'ERROR', 'Forbidden: Insufficient role');
       }
 
       req.membership = membership;
       req.org = membership.org;
       next();
     } catch (err) {
-      return res.status(500).json({ error: 'Internal server error checking role' });
+      if (err instanceof AppError) throw err;
+      throw new AppError(500, 'INTERNAL_ERROR', 'Internal server error checking role');
     }
   };
 }

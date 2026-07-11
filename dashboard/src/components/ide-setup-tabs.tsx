@@ -3,9 +3,10 @@
 import { useState } from 'react';
 import { CopyButton } from '@/components/copy-button';
 import { Button } from '@/components/ui/button';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 
-const MCP_URL = process.env.NEXT_PUBLIC_MCP_URL || 'https://mcp.orgai.dev';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.orgai.dev';
+const MCP_URL = `${API_URL}/mcp`;
 
 type Ide = 'cursor' | 'windsurf' | 'claude' | 'opencode' | 'antigravity' | 'vscode';
 
@@ -17,6 +18,11 @@ const IDES: { id: Ide; name: string }[] = [
   { id: 'antigravity', name: 'Antigravity' },
   { id: 'vscode', name: 'VS Code' },
 ];
+
+function getSetupCommand(apiKey: string | null): string {
+  const key = apiKey || 'YOUR_API_KEY';
+  return `curl -fsSL ${API_URL}/setup.sh | bash -s -- --key ${key}`;
+}
 
 function getConfigSnippet(apiKey: string | null, ide: Ide): string {
   const key = apiKey || 'your-api-key';
@@ -117,70 +123,102 @@ interface IdeSetupTabsProps {
 
 export function IdeSetupTabs({ apiKey }: IdeSetupTabsProps) {
   const [activeTab, setActiveTab] = useState<Ide>('cursor');
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
+  const setupCommand = getSetupCommand(apiKey);
   const currentConfig = getConfigSnippet(apiKey, activeTab);
   const instructions = getInstructions(activeTab);
 
   return (
     <div className="bg-card border rounded-lg overflow-hidden">
-      {/* Tab Header */}
-      <div className="border-b px-4 py-3 bg-muted/30">
-        <div className="flex gap-1 overflow-x-auto">
-          {IDES.map((ide) => (
-            <button
-              key={ide.id}
-              onClick={() => setActiveTab(ide.id)}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
-                activeTab === ide.id
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-              }`}
-            >
-              {ide.name}
-            </button>
-          ))}
+      {/* Primary CTA: Setup Script */}
+      <div className="p-6 space-y-4 border-b">
+        <div>
+          <h3 className="font-semibold text-lg">Quick Setup</h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            Run this command in your terminal to automatically configure your IDE:
+          </p>
         </div>
+        <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-3 border">
+          <code className="flex-1 text-sm font-mono break-all">{setupCommand}</code>
+          <CopyButton value={setupCommand} />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          This detects your IDE and configures it automatically. Restart your IDE after running.
+        </p>
       </div>
 
-      {/* Tab Content */}
-      <div className="p-6 space-y-6">
-        {/* Instructions */}
-        <div>
-          <h3 className="font-semibold mb-2">Instructions</h3>
-          <p className="text-sm text-muted-foreground">{instructions}</p>
-        </div>
+      {/* Advanced / Manual Setup */}
+      <div>
+        <button
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="w-full px-6 py-3 flex items-center justify-between text-sm font-medium hover:bg-muted/30 transition-colors"
+        >
+          <span>Advanced / Manual Setup</span>
+          {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
 
-        {/* Configuration */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold">Configuration</h3>
-            <CopyButton value={currentConfig} />
-          </div>
-          <pre className="bg-muted/50 rounded-lg p-4 overflow-x-auto text-sm font-mono">
-            {currentConfig}
-          </pre>
-          {activeTab === 'vscode' && (
-            <div className="flex items-center gap-2 text-sm">
-              <ExternalLink className="h-4 w-4 text-muted-foreground" />
-              <a
-                href="https://github.com/MrKuros/orgai-platform/releases/latest"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                Download VS Code Extension
-              </a>
-              <span className="text-xs text-muted-foreground">(Coming soon if no release exists)</span>
+        {showAdvanced && (
+          <div className="border-t">
+            {/* Tab Header */}
+            <div className="border-b px-4 py-3 bg-muted/20">
+              <div className="flex gap-1 overflow-x-auto">
+                {IDES.map((ide) => (
+                  <button
+                    key={ide.id}
+                    onClick={() => setActiveTab(ide.id)}
+                    className={`px-4 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
+                      activeTab === ide.id
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                    }`}
+                  >
+                    {ide.name}
+                  </button>
+                ))}
+              </div>
             </div>
-          )}
-        </div>
 
-        {/* Note about MCP URL */}
-        {activeTab !== 'vscode' && (
-          <p className="text-xs text-muted-foreground">
-            Note: This configuration uses the hosted MCP server at <code className="bg-muted px-1 rounded">{MCP_URL}/sse</code>.
-            Once the @orgai/mcp package is published to npm, you can use <code className="bg-muted px-1 rounded">npx @orgai/mcp</code> instead.
-          </p>
+            {/* Tab Content */}
+            <div className="p-6 space-y-6">
+              {/* Instructions */}
+              <div>
+                <h3 className="font-semibold mb-2">Instructions</h3>
+                <p className="text-sm text-muted-foreground">{instructions}</p>
+              </div>
+
+              {/* Configuration */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">Configuration</h3>
+                  <CopyButton value={currentConfig} />
+                </div>
+                <pre className="bg-muted/50 rounded-lg p-4 overflow-x-auto text-sm font-mono">
+                  {currentConfig}
+                </pre>
+                {activeTab === 'vscode' && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                    <a
+                      href="https://github.com/MrKuros/orgai-platform/releases/latest"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      Download VS Code Extension
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {/* Note about MCP URL */}
+              {activeTab !== 'vscode' && (
+                <p className="text-xs text-muted-foreground">
+                  MCP endpoint: <code className="bg-muted px-1 rounded">{MCP_URL}/sse</code>
+                </p>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>
