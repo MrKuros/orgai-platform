@@ -7,7 +7,7 @@ import { OrgAIClient } from "./api-client";
 // Directs the calling agent to pause and involve the human before continuing.
 function guidance(blockerCount: number, warningCount: number): string | undefined {
   if (blockerCount > 0) {
-    return "BLOCKED: do not apply this change. Show the violations to the user and ask how they want to adjust their request before retrying.";
+    return "BLOCKED: do not apply this change as-is. First revise the code yourself using each violation's fix suggestion, then re-run this check. If it still fails after one revision, stop, show the violations to the user, and ask how they want to proceed.";
   }
   if (warningCount > 0) {
     return "WARNINGS: before proceeding, show these warnings to the user and ask whether to proceed as-is or modify their request. Wait for their answer.";
