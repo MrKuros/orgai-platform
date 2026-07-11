@@ -3,8 +3,17 @@
 Runs entirely on your own machine or server. No internet connection or external
 services required. Everything (app, database, audit logs) stays on your hardware.
 
-**Requirements:** Docker with the Compose plugin (Docker Desktop, or
-`docker` + `docker compose` on Linux). 2 GB RAM free.
+**Requirements:** a container engine — either of these, on the one machine
+that will host OrgAI. 2 GB RAM free.
+
+- **Podman** (free for everyone, incl. large enterprises — no Docker Desktop
+  license needed): https://podman.io/docs/installation — on Windows/Mac also
+  install the compose provider (`podman-compose` or Podman Desktop).
+- **Docker**: Docker Engine on Linux (free), or Docker Desktop on Windows/Mac
+  (check your company's licensing policy).
+
+The install script auto-detects whichever one you have. Day-to-day commands
+below use `docker compose`; on Podman substitute `podman compose`.
 
 ---
 
@@ -90,6 +99,16 @@ docker compose up -d                   # migrates the database automatically
 ```
 
 Your data is kept — database migrations run automatically on start.
+
+## Starting on boot (Podman note)
+
+Docker restarts the containers automatically after a reboot. Rootless Podman
+does not — either run `podman compose up -d` after a reboot, or (Linux)
+enable lingering + generate systemd units once:
+
+```bash
+podman generate systemd --new --files --name orgai-api orgai-db orgai-dashboard
+```
 
 ## Troubleshooting
 

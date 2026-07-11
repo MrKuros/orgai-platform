@@ -1,17 +1,30 @@
 #!/usr/bin/env sh
 # OrgAI self-host installer — run once from inside the unpacked bundle:
 #   ./install.sh
+# Works with Docker or Podman (no Docker Desktop required).
 set -eu
 cd "$(dirname "$0")"
 
-command -v docker >/dev/null 2>&1 || {
-  echo "Docker is required. Install it from https://docs.docker.com/get-docker/ and re-run."
+# Pick a container engine: docker if present and running, else podman.
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+  ENGINE=docker
+  COMPOSE="docker compose"
+  docker compose version >/dev/null 2>&1 || COMPOSE="docker-compose"
+elif command -v podman >/dev/null 2>&1; then
+  ENGINE=podman
+  COMPOSE="podman compose"
+  podman compose version >/dev/null 2>&1 || COMPOSE="podman-compose"
+else
+  echo "Docker or Podman is required."
+  echo "  - Docker Engine (Linux, free): https://docs.docker.com/engine/install/"
+  echo "  - Podman (free, no license restrictions): https://podman.io/docs/installation"
   exit 1
-}
+fi
+echo "==> Using $ENGINE"
 
 if [ -f orgai-images.tar.gz ]; then
   echo "==> Loading application images (one-time, ~2 min)"
-  docker load -i orgai-images.tar.gz
+  $ENGINE load -i orgai-images.tar.gz
 fi
 
 if [ ! -f .env ]; then
@@ -24,8 +37,10 @@ if [ ! -f .env ]; then
 fi
 
 echo "==> Starting OrgAI"
-docker compose up -d
+$COMPOSE up -d
 
 echo ""
 echo "Done. Open http://localhost:3000 and sign up — the first signup creates"
 echo "your organization. Full guide: README.md"
+echo "(Day-to-day commands in README.md use 'docker compose'; substitute"
+echo " '$COMPOSE' if you are on Podman.)"
