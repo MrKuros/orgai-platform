@@ -50,14 +50,32 @@ One-time setup:
    again. This switches the built-in MCP server to enforce your live policies
    and record every check in the audit log.
 
-Then each developer adds OrgAI to their agent. Claude Code:
+Then each developer adds OrgAI to their agent — any MCP-capable tool works.
+Two endpoints are served: `http://<server>:8080/mcp` (streamable HTTP, current
+standard) and `http://<server>:8080/mcp/sse` (SSE, for older clients).
+
+**Claude Code**
 
 ```bash
-claude mcp add --transport sse orgai http://<server>:8080/mcp/sse
+claude mcp add --transport http orgai http://<server>:8080/mcp
 ```
 
-Any other MCP-capable agent (Cursor, etc.): SSE endpoint
-`http://<server>:8080/mcp/sse`.
+**Cursor** — `.cursor/mcp.json` in the project (or global settings):
+
+```json
+{ "mcpServers": { "orgai": { "url": "http://<server>:8080/mcp" } } }
+```
+
+**OpenAI Codex** — `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.orgai]
+url = "http://<server>:8080/mcp"
+```
+
+**Anything else** (Windsurf, Copilot, JetBrains…): point its MCP config at
+`http://<server>:8080/mcp`; fall back to the `/mcp/sse` endpoint if the tool
+only supports SSE.
 
 ## 3. Inviting team members
 
