@@ -71,6 +71,9 @@ export function registerTools(server: McpServer) {
     (server as any).prompt("autofix-off", "Disable OrgAI autofix (always ask before changing blocked code)", () => ({
       messages: [{ role: "user", content: { type: "text", text: "Call the set_autofix tool with enabled=false, then confirm to me that autofix is off." } }]
     }));
+    (server as any).prompt("load-policies", "Load org coding policies so code is compliant on the first try", () => ({
+      messages: [{ role: "user", content: { type: "text", text: "Call the get_policy tool for my role, read every policy's skill, and follow them all while writing code for the rest of this session. Summarize the rules for me in a few bullets." } }]
+    }));
   }
 
   const checkComplianceSchema = z.object({

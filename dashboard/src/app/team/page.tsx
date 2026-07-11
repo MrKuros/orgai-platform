@@ -5,7 +5,7 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import { Mail, Plus, Trash2, MoreHorizontal } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
-import { fetcher, inviteMember, deleteMember, updateMember, ApiError } from '@/lib/api';
+import { fetcher, inviteMember, deleteMember, updateMember, getInviteLink, ApiError } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { AppLayout } from '@/components/layout/app-layout';
 import { PageHeader } from '@/components/layout/page-header';
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { InitialsAvatar } from '@/components/initials-avatar';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -105,6 +106,17 @@ export default function TeamPage() {
     }
   };
 
+  const handleCopyInviteLink = async (membershipId: string) => {
+    if (!currentOrg) return;
+    try {
+      const { link } = await getInviteLink(currentOrg.id, membershipId);
+      await navigator.clipboard.writeText(link);
+      toast({ title: 'Invite link copied — send it to them' });
+    } catch (error) {
+      toast({ title: 'Error copying invite link', description: error instanceof ApiError ? error.message : 'Unknown error', variant: 'destructive' });
+    }
+  };
+
   const openChangeRoleDialog = (member: any) => {
     setMemberToChange(member);
     setNewPlatformRole(member.role);
@@ -149,6 +161,7 @@ export default function TeamPage() {
                               <div className="font-medium text-foreground flex items-center gap-2">
                                 {displayName}
                                 {isSelf && <span className="bg-primary/10 text-primary text-[10px] px-1.5 py-0.5 rounded-sm uppercase font-bold tracking-wider">You</span>}
+                                {member.pending && <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-500/40 bg-amber-500/10">Pending</Badge>}
                               </div>
                               <div className="text-muted-foreground text-xs">{email}</div>
                             </div>
@@ -182,6 +195,11 @@ export default function TeamPage() {
                               <DropdownMenuItem onClick={() => openChangeRoleDialog(member)}>
                                 Edit Roles
                               </DropdownMenuItem>
+                              {member.pending && (
+                                <DropdownMenuItem onClick={() => handleCopyInviteLink(member.id)}>
+                                  Copy invite link
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuSeparator />
                               <DropdownMenuItem 
                                 className="text-destructive focus:bg-destructive/10 focus:text-destructive"

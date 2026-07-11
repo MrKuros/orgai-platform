@@ -10,6 +10,7 @@ export interface EvalResult {
   setBy: string;
   description: string;
   suggestion: string;
+  line?: number;
 }
 
 // Approved packages from the CTO policy
@@ -99,7 +100,8 @@ export class Evaluator {
       }
 
       const regex = new RegExp(policy.evaluator.pattern, policy.evaluator.flags || '');
-      if (regex.test(newContent)) {
+      const match = regex.exec(newContent);
+      if (match) {
         violations.push({
           passed: false,
           severity: policy.severity,
@@ -109,6 +111,7 @@ export class Evaluator {
           setBy: policy.setByDisplayName,
           description: `Policy violation detected in "${filePath}" for rule: ${policy.rule}`,
           suggestion: policy.fix_suggestion,
+          line: newContent.slice(0, match.index).split('\n').length,
         });
       }
     }

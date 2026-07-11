@@ -34,9 +34,43 @@ export const membersRouter = Router();
 membersRouter.get('/:orgId/members', requireAuth, requireOrgRole(), async (req, res) => {
   const members = await prisma.membership.findMany({
     where: { orgId: req.org!.id },
-    include: { user: { select: { id: true, email: true, firstName: true, lastName: true } }, assignedRole: true }
+    include: {
+      user: { select: { id: true, email: true, firstName: true, lastName: true, passwordHash: true, workosUserId: true } },
+      assignedRole: true
+    }
   });
-  res.json({ members });
+  // pending = invited but has never set a password / linked SSO
+  res.json({
+    members: members.map(m => {
+      const { passwordHash, workosUserId, ...user } = m.user;
+      return { ...m, user, pending: !passwordHash && !workosUserId };
+    })
+  });
+});
+
+// Regenerate an invite link for a pending member (self-host installs have no
+// email, so the admin copies the link from the dashboard instead).
+membersRouter.post('/:orgId/members/:membershipId/invite-link', requireAuth, requireOrgRole('ORG_ADMIN'), async (req, res) => {
+  const membership = await prisma.membership.findFirst({
+    where: { id: req.params.membershipId, orgId: req.org!.id },
+    include: { user: true }
+  });
+  if (!membership) throw new AppError(404, 'ERROR', 'Member not found');
+  if (membership.user.passwordHash || membership.user.workosUserId) {
+    throw new AppError(400, 'ERROR', 'This member has already activated their account.');
+  }
+
+  const token = await createAuthToken(membership.user.id, 'INVITE', req.org!.id);
+  const base = process.env.DASHBOARD_URL || 'http://localhost:3000';
+
+  await writeAuditLog({
+    orgId: req.org!.id,
+    actorId: req.user!.id,
+    action: 'member.invite_link_generated',
+    resource: membership.user.id
+  });
+
+  res.json({ link: `${base}/accept-invite?token=${token}` });
 });
 
 const inviteSchema = z.object({

@@ -20,6 +20,7 @@ import { ssoRouter } from './routes/sso';
 import { setupRouter } from './routes/setup';
 import { violationsFeedRouter } from './routes/violations';
 import { logger } from './lib/logger';
+import { prisma } from './lib/prisma';
 import { mountMcpRoutes } from './mcp/routes';
 import { swaggerSpec } from './swagger';
 
@@ -60,6 +61,24 @@ app.use('/v1', (req, res, next) => {
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 app.get('/', (req, res) => res.json({ status: 'ok' }));
+
+// Human-readable status for admins/IT ("is every part of the box working?")
+app.get('/status', async (req, res) => {
+  let database = 'ok';
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+  } catch {
+    database = 'unreachable';
+  }
+  res.json({
+    status: database === 'ok' ? 'ok' : 'degraded',
+    version: process.env.npm_package_version || '0.1.0',
+    database,
+    email: process.env.RESEND_API_KEY ? 'configured' : 'log-only',
+    mcp: process.env.COMPLY_API_KEY ? 'api mode (org policies + audit)' : 'standalone (bundled policies)',
+    timestamp: new Date().toISOString(),
+  });
+});
 
 // Swagger docs
 app.get('/v1/docs/openapi.json', (req, res) => res.json(swaggerSpec));

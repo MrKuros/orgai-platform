@@ -4,7 +4,7 @@ import {
   Policy, CreatePolicyInput, UpdatePolicyInput,
   Membership, InviteMemberInput, UpdateMemberInput,
   ApiKey, CreateApiKeyInput, AuditLogEntry,
-  SsoConfig, PolicyVersion
+  SsoConfig, PolicyVersion, OrgStats, TestPolicyResult
 } from './types';
 
 // ?? not ||: empty string means same-origin (self-host proxy via next.config rewrites)
@@ -98,6 +98,14 @@ export async function updateOrg(orgId: string, data: { name?: string; slug?: str
   return fetchApi<{ org: Organization }>(`/orgs/${orgId}`, { method: 'PATCH', body: JSON.stringify(data) });
 }
 
+export async function seedDefaults(orgId: string): Promise<{ roles: number; policies: number }> {
+  return fetchApi<{ roles: number; policies: number }>(`/orgs/${orgId}/seed-defaults`, { method: 'POST' });
+}
+
+export async function getStats(orgId: string): Promise<OrgStats> {
+  return fetchApi<OrgStats>(`/orgs/${orgId}/stats`);
+}
+
 // Roles
 export async function getRoles(orgId: string): Promise<{ roles: Role[] }> {
   return fetchApi<{ roles: Role[] }>(`/orgs/${orgId}/roles`);
@@ -149,6 +157,10 @@ export async function deleteMember(orgId: string, userId: string): Promise<void>
   return fetchApi<void>(`/orgs/${orgId}/members/${userId}`, { method: 'DELETE' });
 }
 
+export async function getInviteLink(orgId: string, membershipId: string): Promise<{ link: string }> {
+  return fetchApi<{ link: string }>(`/orgs/${orgId}/members/${membershipId}/invite-link`, { method: 'POST' });
+}
+
 // API Keys
 export async function getApiKeys(orgId: string): Promise<{ apiKeys: ApiKey[] }> {
   return fetchApi<{ apiKeys: ApiKey[] }>(`/orgs/${orgId}/api-keys`);
@@ -173,6 +185,25 @@ export async function getAuditLog(orgId: string, params?: { cursor?: string; lim
   return fetchApi<{ data: AuditLogEntry[], nextCursor?: string, hasMore: boolean }>(`/orgs/${orgId}/audit${queryString}`);
 }
 
+export async function exportAuditCsv(orgId: string): Promise<void> {
+  const token = localStorage.getItem('orgai_token');
+  const response = await fetch(`${API_URL}/v1/orgs/${orgId}/audit/export`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) {
+    throw new ApiError(response.status, 'Failed to export audit log');
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'audit-log.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export const fetcher = async (url: string) => {
   return fetchApi(url);
 };
@@ -193,6 +224,11 @@ export async function testSsoConnection(orgId: string): Promise<{ success: boole
 // Policy Check
 export async function checkPolicy(orgId: string, data: { type: 'code' | 'command'; content: string; roleName: string; filePath?: string }): Promise<{ passed: boolean; violations: any[] }> {
   return fetchApi<{ passed: boolean; violations: any[] }>(`/orgs/${orgId}/check`, { method: 'POST', body: JSON.stringify(data) });
+}
+
+// Policy Tester
+export async function testPolicy(orgId: string, data: { evaluatorType: string; evaluatorPattern: string; evaluatorFlags?: string; content: string }): Promise<TestPolicyResult> {
+  return fetchApi<TestPolicyResult>(`/orgs/${orgId}/policies/test`, { method: 'POST', body: JSON.stringify(data) });
 }
 
 // Policy Versions

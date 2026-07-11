@@ -12,6 +12,33 @@ import { assertWithinLimit, limitsFor } from '../lib/plans';
 
 export const policiesRouter = Router();
 
+const testPolicySchema = z.object({
+  evaluatorType: z.enum(['regex', 'command']),
+  evaluatorPattern: z.string().min(1).max(500),
+  evaluatorFlags: z.string().max(10).optional(),
+  content: z.string().max(20000),
+});
+
+// Dry-run a pattern against sample content before saving the policy.
+policiesRouter.post('/:orgId/policies/test', requireAuth, requireOrgRole('POLICY_ADMIN', 'ORG_ADMIN'), validate(testPolicySchema), async (req, res) => {
+  const { evaluatorPattern, evaluatorFlags, content } = req.body;
+
+  let regex: RegExp;
+  try {
+    regex = new RegExp(evaluatorPattern, evaluatorFlags || '');
+  } catch (e: any) {
+    return res.json({ valid: false, matched: false, error: e.message });
+  }
+
+  const match = regex.exec(content);
+  res.json({
+    valid: true,
+    matched: !!match,
+    matchedText: match ? match[0].slice(0, 200) : null,
+    line: match ? content.slice(0, match.index).split('\n').length : null,
+  });
+});
+
 /**
  * @swagger
  * /v1/orgs/{orgId}/policies:

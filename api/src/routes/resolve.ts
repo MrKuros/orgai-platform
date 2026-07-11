@@ -207,13 +207,16 @@ resolveRouter.post('/:orgId/check', requireApiKey, validate(checkSchema), async 
     if (policy.evaluatorType === 'none' || !policy.evaluatorPattern) continue;
 
     let isViolation = false;
+    let line: number | undefined;
 
     if (type === 'code' && policy.evaluatorType === 'regex') {
       if (policy.name === 'no-console-log' && filePath?.includes('logger')) continue;
 
       const regex = new RegExp(policy.evaluatorPattern, policy.evaluatorFlags || '');
-      if (regex.test(content)) {
+      const match = regex.exec(content);
+      if (match) {
         isViolation = true;
+        line = content.slice(0, match.index).split('\n').length;
       }
     } else if (type === 'command' && policy.evaluatorType === 'command') {
       const regex = new RegExp(policy.evaluatorPattern);
@@ -229,7 +232,8 @@ resolveRouter.post('/:orgId/check', requireApiKey, validate(checkSchema), async 
         rule: policy.rule,
         severity: policy.severity,
         fixSuggestion: policy.fixSuggestion,
-        setByDisplayName: policy.setByDisplayName
+        setByDisplayName: policy.setByDisplayName,
+        line
       });
 
       if (policy.severity === 'ERROR') {

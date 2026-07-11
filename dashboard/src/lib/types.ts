@@ -154,6 +154,22 @@ export interface CreateApiKeyInput {
   expiresAt?: string;
 }
 
+export interface OrgStats {
+  violationsByDay: { day: string; count: number }[];
+  topPolicies: { policyId: string; name: string; count: number }[];
+  evaluationsThisMonth: number;
+  lastCheckAt: string | null;
+  lastCheckKeyName: string | null;
+}
+
+export interface TestPolicyResult {
+  valid: boolean;
+  matched: boolean;
+  matchedText: string | null;
+  line: number | null;
+  error?: string;
+}
+
 // Responses
 export interface AuthResponse {
   token: string;

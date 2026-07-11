@@ -1,9 +1,9 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import useSWR from 'swr';
-import { AlertTriangle, Plus } from 'lucide-react';
+import { AlertTriangle, Plus, Lightbulb, Copy } from 'lucide-react';
 
 import { useAuth } from '@/lib/auth';
 import { fetcher, createApiKey, ApiError } from '@/lib/api';
@@ -20,6 +20,36 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.orgai.dev';
 export default function IdeSetupPage() {
   const { currentOrg } = useAuth();
   const { toast } = useToast();
+
+  // Empty NEXT_PUBLIC_API_URL means same-origin (self-host proxy) — resolve on the client to avoid hydration mismatch.
+  const [apiBase, setApiBase] = useState(process.env.NEXT_PUBLIC_API_URL || '');
+  useEffect(() => {
+    if (!process.env.NEXT_PUBLIC_API_URL) setApiBase(window.location.origin);
+  }, []);
+  const mcpUrl = `${apiBase}/mcp`;
+
+  const quickConnectBlocks: { title: string; description: string; snippet: string }[] = [
+    {
+      title: 'Claude Code',
+      description: 'Run in your terminal:',
+      snippet: `claude mcp add --transport http orgai ${mcpUrl}`,
+    },
+    {
+      title: 'Cursor',
+      description: 'Add to .cursor/mcp.json:',
+      snippet: JSON.stringify({ mcpServers: { orgai: { url: mcpUrl } } }, null, 2),
+    },
+    {
+      title: 'OpenAI Codex',
+      description: 'Add to ~/.codex/config.toml:',
+      snippet: `[mcp_servers.orgai]\nurl = "${mcpUrl}"`,
+    },
+  ];
+
+  const handleCopySnippet = async (snippet: string, title: string) => {
+    await navigator.clipboard.writeText(snippet);
+    toast({ title: `${title} config copied to clipboard` });
+  };
 
   const { data, mutate, isLoading } = useSWR<any>(
     currentOrg ? `/orgs/${currentOrg.id}/api-keys` : null,
@@ -128,6 +158,47 @@ export default function IdeSetupPage() {
               </form>
             </div>
           )}
+        </div>
+
+        {/* Quick Connect */}
+        <div className="mb-8 p-6 bg-card border rounded-lg space-y-6">
+          <div>
+            <h3 className="font-semibold text-lg">Quick Connect (MCP)</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Point your agent at the OrgAI MCP server.
+            </p>
+          </div>
+
+          {quickConnectBlocks.map((block) => (
+            <div key={block.title} className="space-y-2">
+              <div>
+                <h4 className="font-medium">{block.title}</h4>
+                <p className="text-sm text-muted-foreground">{block.description}</p>
+              </div>
+              <div className="flex items-start gap-2 bg-muted/50 rounded-lg p-3 border">
+                <pre className="flex-1 text-sm font-mono overflow-x-auto whitespace-pre-wrap break-all">{block.snippet}</pre>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 shrink-0"
+                  title="Copy to clipboard"
+                  onClick={() => handleCopySnippet(block.snippet, block.title)}
+                >
+                  <Copy className="h-4 w-4 text-muted-foreground" />
+                  <span className="sr-only">Copy</span>
+                </Button>
+              </div>
+            </div>
+          ))}
+
+          <div className="p-4 border border-primary/20 rounded-lg bg-primary/5 flex items-start gap-3">
+            <Lightbulb className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+            <p className="text-sm">
+              <span className="font-semibold">Make agents compliant on the first try</span> — tell your agent to run{' '}
+              <code className="bg-muted px-1 rounded">get_policy</code> at session start (Claude Code users can run{' '}
+              <code className="bg-muted px-1 rounded">/mcp__orgai__load-policies</code>).
+            </p>
+          </div>
         </div>
 
         {/* IDE Setup Tabs */}

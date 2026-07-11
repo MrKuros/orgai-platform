@@ -6,6 +6,32 @@ import { authOrApiKey } from '../middleware/authOrApiKey';
 
 export const auditRouter = Router();
 
+// CSV export for auditors (most recent 5000 entries)
+auditRouter.get('/:orgId/audit/export', requireAuth, requireOrgRole('ORG_ADMIN', 'POLICY_ADMIN'), async (req, res) => {
+  const rows = await prisma.auditLog.findMany({
+    where: { orgId: req.org!.id },
+    orderBy: { createdAt: 'desc' },
+    take: 5000,
+    include: { actor: { select: { email: true } } },
+  });
+
+  const esc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const lines = ['timestamp,action,actor,resource,metadata'];
+  for (const r of rows) {
+    lines.push([
+      esc(r.createdAt.toISOString()),
+      esc(r.action),
+      esc(r.actor?.email),
+      esc(r.resource),
+      esc(JSON.stringify(r.metadata ?? {})),
+    ].join(','));
+  }
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="orgai-audit-${new Date().toISOString().slice(0, 10)}.csv"`);
+  res.send(lines.join('\n'));
+});
+
 /**
  * @swagger
  * /v1/orgs/{orgId}/audit:
