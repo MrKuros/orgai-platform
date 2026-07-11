@@ -72,8 +72,10 @@ Then:
 
 ## 6. Landing page — Vercel (~5 min)
 
-The `orgai-site` folder is static HTML. In Vercel: **Add New → Project**, import it
-(or `vercel deploy` from the folder), framework preset "Other". Attach `orgai.dev` domain.
+The landing page lives in its own repo, `MrKuros/orgai-site` (static HTML in
+`landing-page/`; the waitlist form posts to Formspree — already wired, no backend).
+In Vercel: **Add New → Project** → import `orgai-site`, Root Directory `landing-page`,
+framework preset "Other". Attach the `orgai.dev` domain.
 
 ## Continuous deployment
 
