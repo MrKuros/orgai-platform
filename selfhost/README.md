@@ -13,11 +13,15 @@ services required. Everything (app, database, audit logs) stays on your hardware
 Unpack the bundle you received, then from inside the folder:
 
 ```bash
-./install.sh
+./install.sh        # Mac / Linux
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File install.ps1   # Windows
 ```
 
 That's it — it loads the images, generates secrets into `.env`, and starts
-everything. (On Windows, run it from Git Bash or WSL.)
+everything.
 
 Open **http://localhost:3000** and sign up — the first signup creates your
 organization and makes you its admin.
