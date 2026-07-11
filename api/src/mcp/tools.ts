@@ -158,6 +158,17 @@ export function registerTools(server: McpServer) {
     async (params: any) => {
       const { policyUrl, userRole, authHeader, bundledPolicyPath } = resolveParams(params);
 
+      // Return only agent-relevant fields — full policy rows (ids, timestamps,
+      // evaluator regexes) waste the calling agent's context tokens.
+      const slim = (p: any) => ({
+        name: p.name || p.id,
+        rule: p.rule,
+        skill: p.skill || undefined,
+        severity: p.severity,
+        fixSuggestion: p.fixSuggestion || p.fix_suggestion || undefined,
+        setBy: p.setByDisplayName || undefined,
+      });
+
       if (isApiMode && client) {
         const orgInfo = await client.getOrgFromApiKey();
         const res = await client.resolveRole(orgInfo.orgId, userRole);
@@ -167,7 +178,7 @@ export function registerTools(server: McpServer) {
             text: JSON.stringify({
               role: res.role.name,
               displayName: res.role.displayName,
-              policies: res.policies,
+              policies: (res.policies || []).map(slim),
               resolvedFrom: res.resolvedFrom
             }, null, 2)
           }]
@@ -180,13 +191,12 @@ export function registerTools(server: McpServer) {
 
       const role = userRole;
       const displayName = engine.getCurrentRoleDisplay();
-      const policies = engine.getResolvedPolicies();
-      const systemPrompt = engine.getSystemPrompt();
+      const policies = engine.getResolvedPolicies().map(slim);
 
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ role, displayName, policies, systemPrompt }, null, 2)
+          text: JSON.stringify({ role, displayName, policies }, null, 2)
         }]
       };
     }
