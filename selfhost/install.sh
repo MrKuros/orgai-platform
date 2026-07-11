@@ -12,6 +12,10 @@ if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
   docker compose version >/dev/null 2>&1 || COMPOSE="docker-compose"
 elif command -v podman >/dev/null 2>&1; then
   ENGINE=podman
+  # rootless podman: compose provider talks to the user socket — make sure it runs
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl --user enable --now podman.socket 2>/dev/null || true
+  fi
   COMPOSE="podman compose"
   podman compose version >/dev/null 2>&1 || COMPOSE="podman-compose"
 else
