@@ -5,8 +5,9 @@ services:
   - type: web
     name: orgai-api
     runtime: docker
-    rootDir: api
-    dockerfilePath: ./Dockerfile
+    # context is the repo root — api/Dockerfile needs packages/core
+    dockerfilePath: ./api/Dockerfile
+    dockerContext: .
     plan: free
     healthCheckPath: /health
     # Free tier has no pre-deploy hook, so run migrations at boot

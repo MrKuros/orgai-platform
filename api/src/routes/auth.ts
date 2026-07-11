@@ -106,8 +106,13 @@ authRouter.post('/signup', validate(signupSchema), async (req, res) => {
       data: { email, passwordHash, firstName, lastName }
     });
 
+    // DEFAULT_PLAN=ENTERPRISE in self-host installs (single paying tenant)
+    const defaultPlan = ['FREE', 'TEAM', 'ENTERPRISE'].includes(process.env.DEFAULT_PLAN || '')
+      ? (process.env.DEFAULT_PLAN as 'FREE' | 'TEAM' | 'ENTERPRISE')
+      : 'FREE';
+
     const org = await tx.organization.create({
-      data: { name: orgName, slug: orgSlug }
+      data: { name: orgName, slug: orgSlug, plan: defaultPlan }
     });
 
     await tx.membership.create({
@@ -136,9 +141,10 @@ authRouter.post('/signup', validate(signupSchema), async (req, res) => {
     secure: process.env.NODE_ENV === 'production',
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
   });
+  const { passwordHash: _ph, ...safeUser } = fullUser!;
   res.status(201).json({
     token,
-    user: fullUser,
+    user: safeUser,
     org: { id: result.org.id, name: result.org.name, slug: result.org.slug }
   });
 });
@@ -360,9 +366,10 @@ authRouter.get('/sso/callback', async (req, res) => {
       include: { memberships: { include: { org: true } } }
     });
     
-    res.json({ 
-      token, 
-      user: fullUser,
+    const { passwordHash: _ph, ...safeUser } = fullUser!;
+    res.json({
+      token,
+      user: safeUser,
       org: { id: org.id, name: org.name, slug: org.slug }
     });
   } catch (error) {

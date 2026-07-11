@@ -1,10 +1,14 @@
+# Build context must be the repo root (needs packages/core):
+#   docker build -f api/Dockerfile .
 FROM node:20-alpine AS build
 WORKDIR /app
-COPY package*.json ./
+# toolchain for native modules (bcrypt has no musl prebuilt)
+RUN apk add --no-cache python3 make g++
+COPY api/package*.json ./
 COPY packages/core /tmp/core
 RUN cd /tmp/core && npm install && npm run build
 RUN npm install
-COPY . .
+COPY api/ .
 RUN mkdir -p node_modules/@comply && cp -r /tmp/core/dist node_modules/@comply/core && cp /tmp/core/package.json node_modules/@comply/core/
 RUN npx prisma generate
 RUN npm run build

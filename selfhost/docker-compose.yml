@@ -1,0 +1,66 @@
+# OrgAI self-hosted — runs entirely on this machine, no internet required.
+# Quick start: cp .env.example .env, edit it, then: docker compose up -d
+name: orgai
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: orgai
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: orgai
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orgai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: orgai-api:${ORGAI_VERSION:-latest}
+    build:
+      context: ..
+      dockerfile: api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "npx prisma migrate deploy && node dist/index.js"
+    environment:
+      NODE_ENV: production
+      PORT: "8080"
+      DATABASE_URL: postgresql://orgai:${POSTGRES_PASSWORD}@db:5432/orgai
+      DIRECT_DATABASE_URL: postgresql://orgai:${POSTGRES_PASSWORD}@db:5432/orgai
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      # Dashboard proxies /v1/* server-side, so browsers never hit this origin
+      # directly except for MCP/API-key clients on the LAN.
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      DASHBOARD_URL: ${DASHBOARD_URL:-http://localhost:3000}
+      # Self-host = single paying tenant, no usage quotas
+      DEFAULT_PLAN: ENTERPRISE
+      # After creating an API key in the dashboard, paste it in .env to enable
+      # the built-in MCP server (http://<host>:8080/mcp/sse) for your AI agents.
+      COMPLY_API_KEY: ${COMPLY_API_KEY:-}
+      # No RESEND_API_KEY: invite/reset emails are printed to `docker compose logs api`
+    ports:
+      - "${API_PORT:-8080}:8080"
+
+  dashboard:
+    image: orgai-dashboard:${ORGAI_VERSION:-latest}
+    build:
+      context: ../dashboard
+      args:
+        # empty on purpose: browser uses same-origin /v1/*, proxied to the api
+        # service by the rewrite baked in at build time
+        NEXT_PUBLIC_API_URL: ""
+        API_PROXY_URL: http://api:8080
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${DASHBOARD_PORT:-3000}:3000"
+
+volumes:
+  pgdata:
