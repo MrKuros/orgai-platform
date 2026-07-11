@@ -10,7 +10,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp src/policies.json dist/policies.json",
     "dev": "ts-node src/stdio.ts",
     "start:stdio": "node dist/stdio.js",
     "start:http": "node dist/http.js",

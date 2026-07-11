@@ -13,7 +13,9 @@ describe("tools", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     delete process.env.COMPLY_API_KEY;
-    
+    // tools fail closed when isLoaded() is falsy — the auto-mock returns undefined
+    (PolicyEngine.prototype.isLoaded as jest.Mock).mockReturnValue(true);
+
     server = {
       tool: jest.fn((name, desc, shape, handler) => {
         mockTools[name] = handler;
@@ -46,6 +48,15 @@ describe("tools", () => {
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.passed).toBe(false);
       expect(parsed.blockers).toHaveLength(1);
+      expect(parsed.guidance).toMatch(/BLOCKED/);
+    });
+
+    it("2b. check_compliance fails closed when no policies load", async () => {
+      (PolicyEngine.prototype.isLoaded as jest.Mock).mockReturnValue(false);
+
+      const result = await mockTools.check_compliance({ code: "const x = 1" });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/Failing closed/);
     });
 
     it("3. check_command blocks npm install --save", async () => {

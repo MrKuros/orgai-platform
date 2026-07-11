@@ -244,6 +244,11 @@ export class PolicyEngine {
   /**
    * Get the flat list of resolved policies with attribution.
    */
+  /** False when load() found no usable policy source — callers should fail closed. */
+  public isLoaded(): boolean {
+    return this.config !== null;
+  }
+
   public getResolvedPolicies(): ResolvedPolicy[] {
     return this.resolvedPolicies;
   }

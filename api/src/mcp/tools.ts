@@ -4,6 +4,28 @@ import * as path from "path";
 import { PolicyEngine, Evaluator } from "@comply/core";
 import { OrgAIClient } from "./api-client";
 
+// Directs the calling agent to pause and involve the human before continuing.
+function guidance(blockerCount: number, warningCount: number): string | undefined {
+  if (blockerCount > 0) {
+    return "BLOCKED: do not apply this change. Show the violations to the user and ask how they want to adjust their request before retrying.";
+  }
+  if (warningCount > 0) {
+    return "WARNINGS: before proceeding, show these warnings to the user and ask whether to proceed as-is or modify their request. Wait for their answer.";
+  }
+  return undefined;
+}
+
+// Fail closed: a compliance check with no policies loaded must not pass.
+function noPoliciesError() {
+  return {
+    content: [{
+      type: "text" as const,
+      text: "No compliance policies could be loaded (policy URL, workspace config and bundled policies all unavailable). Failing closed: do not proceed — report this configuration problem to the user."
+    }],
+    isError: true
+  };
+}
+
 function resolveParams(input: { policyUrl?: string; userRole?: string; authHeader?: string }) {
   return {
     policyUrl: input.policyUrl || process.env.COMPLY_POLICY_URL || undefined,
@@ -52,13 +74,14 @@ export function registerTools(server: McpServer) {
         return {
           content: [{
             type: "text" as const,
-            text: JSON.stringify({ passed: res.passed, violations: res.violations, blockers, warnings, summary }, null, 2)
+            text: JSON.stringify({ passed: res.passed, violations: res.violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length) }, null, 2)
           }]
         };
       }
 
       const engine = new PolicyEngine({ policyUrl, authHeader, bundledPolicyPath });
       await engine.load();
+      if (!engine.isLoaded()) return noPoliciesError();
       engine.resolve(userRole);
 
       const evaluator = new Evaluator(engine.getResolvedPolicies());
@@ -76,7 +99,7 @@ export function registerTools(server: McpServer) {
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ passed, violations, blockers, warnings, summary }, null, 2)
+          text: JSON.stringify({ passed, violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length) }, null, 2)
         }]
       };
     }
@@ -115,13 +138,14 @@ export function registerTools(server: McpServer) {
         return {
           content: [{
             type: "text" as const,
-            text: JSON.stringify({ passed: res.passed, violations: res.violations, blockers, warnings, summary }, null, 2)
+            text: JSON.stringify({ passed: res.passed, violations: res.violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length) }, null, 2)
           }]
         };
       }
 
       const engine = new PolicyEngine({ policyUrl, authHeader, bundledPolicyPath });
       await engine.load();
+      if (!engine.isLoaded()) return noPoliciesError();
       engine.resolve(userRole);
 
       const evaluator = new Evaluator(engine.getResolvedPolicies());
@@ -139,7 +163,7 @@ export function registerTools(server: McpServer) {
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ passed, violations, blockers, warnings, summary }, null, 2)
+          text: JSON.stringify({ passed, violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length) }, null, 2)
         }]
       };
     }
@@ -187,6 +211,7 @@ export function registerTools(server: McpServer) {
 
       const engine = new PolicyEngine({ policyUrl, authHeader, bundledPolicyPath });
       await engine.load();
+      if (!engine.isLoaded()) return noPoliciesError();
       engine.resolve(userRole);
 
       const role = userRole;
@@ -225,6 +250,7 @@ export function registerTools(server: McpServer) {
       } else {
         const engine = new PolicyEngine({ policyUrl, authHeader, bundledPolicyPath });
         await engine.load();
+        if (!engine.isLoaded()) return noPoliciesError();
         engine.resolve(userRole);
         evaluator = new Evaluator(engine.getResolvedPolicies());
       }
@@ -292,7 +318,7 @@ export function registerTools(server: McpServer) {
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ files, commands, totalBlockers, totalWarnings, passed }, null, 2)
+          text: JSON.stringify({ files, commands, totalBlockers, totalWarnings, passed, guidance: guidance(totalBlockers, totalWarnings) }, null, 2)
         }]
       };
     }
