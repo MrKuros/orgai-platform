@@ -51,6 +51,17 @@ describe("tools", () => {
       expect(parsed.guidance).toMatch(/BLOCKED/);
     });
 
+    it("2c. set_autofix(false) switches blocked guidance to ask-the-user", async () => {
+      (Evaluator.prototype.evaluateCode as jest.Mock).mockReturnValue([{
+        policyName: "no-hardcoded-secrets", severity: "error"
+      }]);
+
+      await mockTools.set_autofix({ enabled: false });
+      const result = await mockTools.check_compliance({ code: "const secret = '123'" });
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.guidance).toMatch(/Autofix is disabled/);
+    });
+
     it("2b. check_compliance fails closed when no policies load", async () => {
       (PolicyEngine.prototype.isLoaded as jest.Mock).mockReturnValue(false);
 

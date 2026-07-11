@@ -5,9 +5,11 @@ import { PolicyEngine, Evaluator } from "@comply/core";
 import { OrgAIClient } from "./api-client";
 
 // Directs the calling agent to pause and involve the human before continuing.
-function guidance(blockerCount: number, warningCount: number): string | undefined {
+function guidance(blockerCount: number, warningCount: number, autoFix: boolean): string | undefined {
   if (blockerCount > 0) {
-    return "BLOCKED: do not apply this change as-is. First revise the code yourself using each violation's fix suggestion, then re-run this check. If it still fails after one revision, stop, show the violations to the user, and ask how they want to proceed.";
+    return autoFix
+      ? "BLOCKED: do not apply this change as-is. First revise the code yourself using each violation's fix suggestion, then re-run this check. If it still fails after one revision, stop, show the violations to the user, and ask how they want to proceed."
+      : "BLOCKED: do not apply this change. Autofix is disabled — do not revise the code yourself. Show the violations to the user and ask how they want to proceed.";
   }
   if (warningCount > 0) {
     return "WARNINGS: before proceeding, show these warnings to the user and ask whether to proceed as-is or modify their request. Wait for their answer.";
@@ -38,6 +40,35 @@ function resolveParams(input: { policyUrl?: string; userRole?: string; authHeade
 export function registerTools(server: McpServer) {
   const isApiMode = !!process.env.COMPLY_API_KEY;
   const client = isApiMode ? new OrgAIClient() : null;
+
+  // Per-session toggle; COMPLY_AUTOFIX=false sets the default for the whole install.
+  let autoFix = process.env.COMPLY_AUTOFIX !== 'false';
+
+  server.tool(
+    "set_autofix",
+    "Enable or disable autofix for this session. When enabled (default), the agent is told to self-correct blocked code using policy fix suggestions before asking the user. When disabled, every blocked check goes straight to the user.",
+    { enabled: z.boolean().describe("true to enable autofix, false to disable") } as any,
+    async (params: any) => {
+      autoFix = !!params.enabled;
+      return {
+        content: [{
+          type: "text" as const,
+          text: `Autofix is now ${autoFix ? 'ENABLED: blocked code will be self-corrected using policy fix suggestions before involving the user' : 'DISABLED: every blocked check will be shown to the user before any code is changed'}.`
+        }]
+      };
+    }
+  );
+
+  // Exposed as slash commands in MCP clients that surface prompts
+  // (e.g. /mcp__orgai__autofix-on in Claude Code).
+  if (typeof (server as any).prompt === 'function') {
+    (server as any).prompt("autofix-on", "Enable OrgAI autofix (agent self-corrects blocked code)", () => ({
+      messages: [{ role: "user", content: { type: "text", text: "Call the set_autofix tool with enabled=true, then confirm to me that autofix is on." } }]
+    }));
+    (server as any).prompt("autofix-off", "Disable OrgAI autofix (always ask before changing blocked code)", () => ({
+      messages: [{ role: "user", content: { type: "text", text: "Call the set_autofix tool with enabled=false, then confirm to me that autofix is off." } }]
+    }));
+  }
 
   const checkComplianceSchema = z.object({
     code: z.string().describe("The code to check"),
@@ -74,7 +105,7 @@ export function registerTools(server: McpServer) {
         return {
           content: [{
             type: "text" as const,
-            text: JSON.stringify({ passed: res.passed, violations: res.violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length) }, null, 2)
+            text: JSON.stringify({ passed: res.passed, violations: res.violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length, autoFix) }, null, 2)
           }]
         };
       }
@@ -99,7 +130,7 @@ export function registerTools(server: McpServer) {
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ passed, violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length) }, null, 2)
+          text: JSON.stringify({ passed, violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length, autoFix) }, null, 2)
         }]
       };
     }
@@ -138,7 +169,7 @@ export function registerTools(server: McpServer) {
         return {
           content: [{
             type: "text" as const,
-            text: JSON.stringify({ passed: res.passed, violations: res.violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length) }, null, 2)
+            text: JSON.stringify({ passed: res.passed, violations: res.violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length, autoFix) }, null, 2)
           }]
         };
       }
@@ -163,7 +194,7 @@ export function registerTools(server: McpServer) {
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ passed, violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length) }, null, 2)
+          text: JSON.stringify({ passed, violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length, autoFix) }, null, 2)
         }]
       };
     }
@@ -318,7 +349,7 @@ export function registerTools(server: McpServer) {
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ files, commands, totalBlockers, totalWarnings, passed, guidance: guidance(totalBlockers, totalWarnings) }, null, 2)
+          text: JSON.stringify({ files, commands, totalBlockers, totalWarnings, passed, guidance: guidance(totalBlockers, totalWarnings, autoFix) }, null, 2)
         }]
       };
     }
