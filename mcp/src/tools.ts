@@ -41,19 +41,22 @@ export function registerTools(server: McpServer) {
   const isApiMode = !!process.env.COMPLY_API_KEY;
   const client = isApiMode ? new OrgAIClient() : null;
 
-  // Per-session toggle; COMPLY_AUTOFIX=false sets the default for the whole install.
-  let autoFix = process.env.COMPLY_AUTOFIX !== 'false';
+  // Autofix precedence: session toggle (set_autofix) > org dashboard setting
+  // (API mode) > COMPLY_AUTOFIX env > on.
+  const envAutoFix = process.env.COMPLY_AUTOFIX !== 'false';
+  let sessionAutoFix: boolean | null = null;
+  const effectiveAutoFix = (orgAutoFix?: boolean) => sessionAutoFix ?? orgAutoFix ?? envAutoFix;
 
   server.tool(
     "set_autofix",
     "Enable or disable autofix for this session. When enabled (default), the agent is told to self-correct blocked code using policy fix suggestions before asking the user. When disabled, every blocked check goes straight to the user.",
     { enabled: z.boolean().describe("true to enable autofix, false to disable") } as any,
     async (params: any) => {
-      autoFix = !!params.enabled;
+      sessionAutoFix = !!params.enabled;
       return {
         content: [{
           type: "text" as const,
-          text: `Autofix is now ${autoFix ? 'ENABLED: blocked code will be self-corrected using policy fix suggestions before involving the user' : 'DISABLED: every blocked check will be shown to the user before any code is changed'}.`
+          text: `Autofix is now ${sessionAutoFix ? 'ENABLED: blocked code will be self-corrected using policy fix suggestions before involving the user' : 'DISABLED: every blocked check will be shown to the user before any code is changed'} for this session (overrides the organization default).`
         }]
       };
     }
@@ -105,7 +108,7 @@ export function registerTools(server: McpServer) {
         return {
           content: [{
             type: "text" as const,
-            text: JSON.stringify({ passed: res.passed, violations: res.violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length, autoFix) }, null, 2)
+            text: JSON.stringify({ passed: res.passed, violations: res.violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length, effectiveAutoFix(orgInfo.autoFix)) }, null, 2)
           }]
         };
       }
@@ -130,7 +133,7 @@ export function registerTools(server: McpServer) {
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ passed, violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length, autoFix) }, null, 2)
+          text: JSON.stringify({ passed, violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length, effectiveAutoFix()) }, null, 2)
         }]
       };
     }
@@ -169,7 +172,7 @@ export function registerTools(server: McpServer) {
         return {
           content: [{
             type: "text" as const,
-            text: JSON.stringify({ passed: res.passed, violations: res.violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length, autoFix) }, null, 2)
+            text: JSON.stringify({ passed: res.passed, violations: res.violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length, effectiveAutoFix(orgInfo.autoFix)) }, null, 2)
           }]
         };
       }
@@ -194,7 +197,7 @@ export function registerTools(server: McpServer) {
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ passed, violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length, autoFix) }, null, 2)
+          text: JSON.stringify({ passed, violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length, effectiveAutoFix()) }, null, 2)
         }]
       };
     }
@@ -273,11 +276,13 @@ export function registerTools(server: McpServer) {
       const { policyUrl, userRole, authHeader, bundledPolicyPath } = resolveParams(params);
       
       let orgId: string | null = null;
+      let orgAutoFix: boolean | undefined;
       let evaluator: Evaluator | null = null;
-      
+
       if (isApiMode && client) {
         const orgInfo = await client.getOrgFromApiKey();
         orgId = orgInfo.orgId;
+        orgAutoFix = orgInfo.autoFix;
       } else {
         const engine = new PolicyEngine({ policyUrl, authHeader, bundledPolicyPath });
         await engine.load();
@@ -349,7 +354,7 @@ export function registerTools(server: McpServer) {
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ files, commands, totalBlockers, totalWarnings, passed, guidance: guidance(totalBlockers, totalWarnings, autoFix) }, null, 2)
+          text: JSON.stringify({ files, commands, totalBlockers, totalWarnings, passed, guidance: guidance(totalBlockers, totalWarnings, effectiveAutoFix(orgAutoFix)) }, null, 2)
         }]
       };
     }

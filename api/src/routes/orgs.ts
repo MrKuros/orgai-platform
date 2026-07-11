@@ -40,7 +40,8 @@ orgsRouter.get('/:orgId', requireAuth, requireOrgRole(), async (req, res) => {
 
 const updateOrgSchema = z.object({
   name: z.string().min(1).optional(),
-  slug: z.string().min(1).optional()
+  slug: z.string().min(1).optional(),
+  autoFix: z.boolean().optional()
 });
 
 /**
@@ -76,19 +77,19 @@ const updateOrgSchema = z.object({
  *         description: Organization slug might be taken
  */
 orgsRouter.patch('/:orgId', requireAuth, requireOrgRole('ORG_ADMIN'), validate(updateOrgSchema), async (req, res) => {
-  const { name, slug } = req.body;
+  const { name, slug, autoFix } = req.body;
 
   try {
     const org = await prisma.organization.update({
       where: { id: req.org!.id },
-      data: { name, slug }
+      data: { name, slug, autoFix }
     });
 
     await writeAuditLog({
       orgId: org.id,
       actorId: req.user!.id,
       action: 'org.updated',
-      metadata: { name, slug }
+      metadata: { name, slug, autoFix }
     });
 
     res.json({ org });

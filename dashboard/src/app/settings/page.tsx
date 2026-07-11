@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
 import useSWR from 'swr';
-import { Settings, Shield, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Settings, Shield, AlertCircle, CheckCircle2, Wand2 } from 'lucide-react';
 
 import { useAuth } from '@/lib/auth';
 import { fetcher, updateOrg, getSsoConfig, saveSsoConfig, testSsoConnection, ApiError } from '@/lib/api';
@@ -24,6 +24,11 @@ export default function SettingsPage() {
 
   const { data: ssoData, mutate: mutateSso } = useSWR<any>(
     currentOrg ? `/orgs/${currentOrg.id}/sso` : null,
+    fetcher
+  );
+
+  const { data: orgData, mutate: mutateOrgData } = useSWR<any>(
+    currentOrg ? `/orgs/${currentOrg.id}` : null,
     fetcher
   );
 
@@ -52,6 +57,27 @@ export default function SettingsPage() {
       });
     } finally {
       setIsUpdatingOrg(false);
+    }
+  };
+
+  const handleToggleAutoFix = async () => {
+    if (!currentOrg || !orgData?.org) return;
+    const next = !orgData.org.autoFix;
+    try {
+      await updateOrg(currentOrg.id, { autoFix: next });
+      mutateOrgData();
+      toast({
+        title: next ? 'Autofix enabled' : 'Autofix disabled',
+        description: next
+          ? 'AI agents will self-correct blocked code using policy fix suggestions.'
+          : 'AI agents will always ask the developer before changing blocked code.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error updating autofix',
+        description: error instanceof ApiError ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -144,6 +170,38 @@ export default function SettingsPage() {
                   Save Changes
                 </Button>
               </form>
+            </CardContent>
+          </Card>
+
+          {/* AI Agent Enforcement */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wand2 className="h-5 w-5" />
+                AI Agent Enforcement
+              </CardTitle>
+              <CardDescription>
+                How AI agents handle code that violates a blocking policy.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 accent-primary cursor-pointer"
+                  checked={orgData?.org?.autoFix ?? true}
+                  onChange={handleToggleAutoFix}
+                  disabled={!orgData?.org}
+                />
+                <span>
+                  <span className="font-medium block">Autofix blocked code</span>
+                  <span className="text-sm text-muted-foreground block">
+                    On: agents self-correct violations using each policy&apos;s fix suggestion, then re-check.
+                    Off: agents always show violations to the developer and wait before changing anything.
+                    Developers can override this per session from their editor.
+                  </span>
+                </span>
+              </label>
             </CardContent>
           </Card>
 

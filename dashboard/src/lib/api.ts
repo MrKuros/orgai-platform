@@ -94,7 +94,7 @@ export async function getOrg(orgId: string): Promise<{ org: Organization }> {
   return fetchApi<{ org: Organization }>(`/orgs/${orgId}`);
 }
 
-export async function updateOrg(orgId: string, data: { name?: string; slug?: string }): Promise<{ org: Organization }> {
+export async function updateOrg(orgId: string, data: { name?: string; slug?: string; autoFix?: boolean }): Promise<{ org: Organization }> {
   return fetchApi<{ org: Organization }>(`/orgs/${orgId}`, { method: 'PATCH', body: JSON.stringify(data) });
 }
 

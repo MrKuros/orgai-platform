@@ -570,6 +570,7 @@ authRouter.get('/me/api', requireApiKey, (req, res) => {
     orgId:    org.id,
     orgName:  org.name,
     orgSlug:  org.slug,
+    autoFix:  org.autoFix,
     keyName:  key.name,
     scopes:   key.scopes,
   });

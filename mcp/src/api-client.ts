@@ -1,9 +1,12 @@
-type OrgInfo = { orgId: string; orgName: string; orgSlug: string; keyName: string; scopes: string[] };
+type OrgInfo = { orgId: string; orgName: string; orgSlug: string; autoFix?: boolean; keyName: string; scopes: string[] };
+
+const ORG_CACHE_TTL_MS = 60_000; // dashboard setting changes reach live sessions within a minute
 
 export class OrgAIClient {
   private apiUrl: string;
   private apiKey: string;
   private orgCache: OrgInfo | null = null;
+  private orgCacheAt = 0;
 
   constructor(apiKey?: string, apiUrl?: string) {
     this.apiKey = apiKey || process.env.COMPLY_API_KEY || '';
@@ -32,9 +35,10 @@ export class OrgAIClient {
   }
 
   async getOrgFromApiKey() {
-    if (this.orgCache) return this.orgCache;
+    if (this.orgCache && Date.now() - this.orgCacheAt < ORG_CACHE_TTL_MS) return this.orgCache;
     const data = await this.request('/v1/auth/me/api');
     this.orgCache = data as OrgInfo;
+    this.orgCacheAt = Date.now();
     return this.orgCache;
   }
 

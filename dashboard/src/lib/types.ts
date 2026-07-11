@@ -16,6 +16,7 @@ export interface Organization {
   id: string;
   name: string;
   slug: string;
+  autoFix?: boolean;
   createdAt: string;
   updatedAt: string;
 }
