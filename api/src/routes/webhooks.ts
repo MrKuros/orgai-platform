@@ -5,6 +5,8 @@ import { validate } from '../middleware/validate';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireOrgRole } from '../middleware/auth';
 import { writeAuditLog } from '../services/audit';
+import { isBlockedWebhookHost } from '../services/webhook';
+import { AppError } from '../lib/AppError';
 
 export const webhooksRouter = Router();
 
@@ -85,6 +87,10 @@ const createWebhookSchema = z.object({
 webhooksRouter.post('/:orgId/webhooks', requireAuth, requireOrgRole('ORG_ADMIN'), validate(createWebhookSchema), async (req, res) => {
   const { url, events } = req.body;
 
+  if (isBlockedWebhookHost(url)) {
+    throw new AppError(400, 'ERROR', 'Webhook URL points to a private, loopback, or link-local address, which is not allowed.');
+  }
+
   const secret = `whsec_${crypto.randomBytes(32).toString('hex')}`;
 
   const webhook = await prisma.webhook.create({
@@ -155,6 +161,10 @@ const updateWebhookSchema = z.object({
  */
 webhooksRouter.patch('/:orgId/webhooks/:webhookId', requireAuth, requireOrgRole('ORG_ADMIN'), validate(updateWebhookSchema), async (req, res) => {
   const { webhookId } = req.params;
+
+  if (req.body.url && isBlockedWebhookHost(req.body.url)) {
+    throw new AppError(400, 'ERROR', 'Webhook URL points to a private, loopback, or link-local address, which is not allowed.');
+  }
 
   const webhook = await prisma.webhook.update({
     where: { id: webhookId, orgId: req.org!.id },

@@ -6,7 +6,7 @@ import { logger } from '../lib/logger';
 // ponytail: hostname/literal-IP check only; does not resolve DNS. A hostname
 // that resolves to a private IP still slips through — add DNS resolution +
 // re-check if that threat matters for this deployment.
-function isBlockedWebhookHost(rawUrl: string): boolean {
+export function isBlockedWebhookHost(rawUrl: string): boolean {
   let host: string;
   try {
     host = new URL(rawUrl).hostname.toLowerCase();
