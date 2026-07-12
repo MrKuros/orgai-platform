@@ -20,6 +20,7 @@ docker save "orgai-api:$VERSION" "orgai-dashboard:$VERSION" postgres:16-alpine \
   | gzip > "$STAGE/$OUT/orgai-images.tar.gz"
 
 cp selfhost/docker-compose.yml selfhost/README.md selfhost/install.sh selfhost/install.ps1 "$STAGE/$OUT/"
+mkdir -p "$STAGE/$OUT/hooks" && cp selfhost/hooks/pre-commit "$STAGE/$OUT/hooks/"
 # pin the version so `docker compose up` uses exactly these images
 sed "s/^#*ORGAI_VERSION=.*//" selfhost/.env.example > "$STAGE/$OUT/.env.example"
 printf '\n# Pinned by build-bundle.sh — do not change\nORGAI_VERSION=%s\n' "$VERSION" \

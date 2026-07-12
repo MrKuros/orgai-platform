@@ -106,7 +106,36 @@ docker compose exec db pg_dump -U orgai orgai > orgai-backup-$(date +%F).sql
 cat orgai-backup-YYYY-MM-DD.sql | docker compose exec -T db psql -U orgai orgai
 ```
 
-## 5. Updating
+## 5. Git backstop (optional, recommended)
+
+The MCP integration checks AI output before it's written. As a safety net for
+code that slips past (agent skipped the check, human paste, etc.), install the
+bundled pre-commit hook in each developer repo:
+
+```bash
+cp hooks/pre-commit YOUR_REPO/.git/hooks/pre-commit
+chmod +x YOUR_REPO/.git/hooks/pre-commit
+cd YOUR_REPO
+git config orgai.apiurl http://<server>:8080
+git config orgai.apikey oai_...      # from dashboard → API Keys
+git config orgai.role junior        # role to enforce
+```
+
+Commits with ERROR-severity violations are blocked (with file + line + fix
+suggestion); WARNING-level ones are printed but allowed. Bypass once with
+`COMPLY_SKIP=1 git commit ...`.
+
+**CI:** the same script checks a ref range — add to your pipeline:
+
+```bash
+COMPLY_API_KEY=oai_... COMPLY_API_URL=http://<server>:8080 \
+  ./hooks/pre-commit origin/main HEAD
+```
+
+Non-zero exit fails the build. Violations are always logged in the org audit
+trail, whether or not the commit is blocked.
+
+## 6. Updating
 
 When you receive a new bundle:
 
