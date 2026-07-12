@@ -31,6 +31,14 @@ if (Test-Path orgai-images.tar.gz) {
 }
 
 if (-not (Test-Path .env)) {
+  # Upgrade guard: existing orgai_pgdata volume + no .env => fresh secrets would
+  # not match the encrypted data (api crash-loop, dead sessions).
+  $vols = & $engine volume ls --format '{{.Name}}' 2>$null
+  if ($vols -contains 'orgai_pgdata') {
+    Write-Host "Existing OrgAI data found (volume 'orgai_pgdata') but no .env in this folder."
+    Write-Host "Copy your previous .env into this folder before upgrading, then re-run install."
+    exit 1
+  }
   Write-Host "==> Generating configuration (.env) with random secrets"
   Copy-Item .env.example .env
   $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
@@ -38,10 +46,12 @@ if (-not (Test-Path .env)) {
     $b = New-Object byte[] $bytes; $rng.GetBytes($b)
     ($b | ForEach-Object { $_.ToString("x2") }) -join ""
   }
-  (Get-Content .env) `
+  $env = (Get-Content .env) `
     -replace '^JWT_SECRET=.*', "JWT_SECRET=$(New-Hex 32)" `
-    -replace '^POSTGRES_PASSWORD=.*', "POSTGRES_PASSWORD=$(New-Hex 16)" |
-    Set-Content .env
+    -replace '^POSTGRES_PASSWORD=.*', "POSTGRES_PASSWORD=$(New-Hex 16)"
+  # PS 5.1 Set-Content writes CRLF + BOM; the trailing \r on values breaks the
+  # podman-compose .env parser. Write LF, no BOM.
+  [IO.File]::WriteAllText((Join-Path $PSScriptRoot ".env"), ($env -join "`n") + "`n")
 }
 
 Write-Host "==> Starting OrgAI"

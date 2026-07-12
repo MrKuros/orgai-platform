@@ -3,8 +3,8 @@ export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
 import useSWR from 'swr';
-import { Mail, Plus, Trash2, MoreHorizontal } from 'lucide-react';
-import { useAuth } from '@/lib/auth';
+import { Mail, Plus, Trash2, MoreHorizontal, AlertTriangle } from 'lucide-react';
+import { useAuth, useRole } from '@/lib/auth';
 import { fetcher, inviteMember, deleteMember, updateMember, getInviteLink, ApiError } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { AppLayout } from '@/components/layout/app-layout';
@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
+import { EmptyState } from '@/components/ui/empty-state';
 import { InitialsAvatar } from '@/components/initials-avatar';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -22,9 +23,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 
 export default function TeamPage() {
   const { currentOrg, user: currentUser } = useAuth();
+  const { canManageOrg } = useRole();
   const { toast } = useToast();
-  
-  const { data: membersData, mutate: mutateMembers, isLoading: membersLoading } = useSWR<any>(currentOrg ? `/orgs/${currentOrg.id}/members` : null, fetcher);
+
+  const { data: membersData, mutate: mutateMembers, isLoading: membersLoading, error: membersError } = useSWR<any>(currentOrg ? `/orgs/${currentOrg.id}/members` : null, fetcher);
   const { data: rolesData } = useSWR<any>(currentOrg ? `/orgs/${currentOrg.id}/roles` : null, fetcher);
   
   const members = membersData?.members || [];
@@ -127,12 +129,19 @@ export default function TeamPage() {
     <AppLayout>
       <div className="container mx-auto p-6 max-w-5xl">
         <PageHeader 
-          title="Team" 
+          title="Team"
           description="Manage who has access to your organization and their roles."
-          action={<Button onClick={() => setIsInviteOpen(true)}><Mail className="w-4 h-4 mr-2" /> Invite Member</Button>}
+          action={canManageOrg ? <Button onClick={() => setIsInviteOpen(true)}><Mail className="w-4 h-4 mr-2" /> Invite Member</Button> : undefined}
         />
 
-        {membersLoading ? (
+        {membersError ? (
+          <EmptyState
+            icon={<AlertTriangle className="w-10 h-10 text-destructive" />}
+            title="Couldn't load team"
+            description="Something went wrong fetching your team members. Check your connection and try again."
+            action={<Button onClick={() => mutateMembers()}>Retry</Button>}
+          />
+        ) : membersLoading ? (
           <div className="flex justify-center p-12"><Spinner className="w-8 h-8" /></div>
         ) : (
           <div className="bg-card border rounded-lg overflow-hidden">
@@ -183,6 +192,7 @@ export default function TeamPage() {
                           )}
                         </td>
                         <td className="px-6 py-4 text-right">
+                          {canManageOrg && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" className="h-8 w-8 p-0">
@@ -210,6 +220,7 @@ export default function TeamPage() {
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
+                          )}
                         </td>
                       </tr>
                     );
@@ -246,7 +257,7 @@ export default function TeamPage() {
             <div className="space-y-2">
               <Label htmlFor="role">Platform Access Level</Label>
               <Select value={inviteRole} onValueChange={(val: any) => setInviteRole(val)} disabled={isInviting}>
-                <SelectTrigger>
+                <SelectTrigger id="role">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -259,7 +270,7 @@ export default function TeamPage() {
             <div className="space-y-2">
               <Label htmlFor="assignedRole">Organization Role (for Policies)</Label>
               <Select value={inviteAssignedRoleId} onValueChange={setInviteAssignedRoleId} disabled={isInviting}>
-                <SelectTrigger>
+                <SelectTrigger id="assignedRole">
                   <SelectValue placeholder="Select an org role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -294,7 +305,7 @@ export default function TeamPage() {
             <div className="space-y-2">
               <Label htmlFor="editRole">Platform Access Level</Label>
               <Select value={newPlatformRole} onValueChange={(val: any) => setNewPlatformRole(val)} disabled={isChanging}>
-                <SelectTrigger>
+                <SelectTrigger id="editRole">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -307,7 +318,7 @@ export default function TeamPage() {
             <div className="space-y-2">
               <Label htmlFor="editAssignedRole">Organization Role (for Policies)</Label>
               <Select value={newAssignedRole} onValueChange={setNewAssignedRole} disabled={isChanging}>
-                <SelectTrigger>
+                <SelectTrigger id="editAssignedRole">
                   <SelectValue placeholder="Select an org role" />
                 </SelectTrigger>
                 <SelectContent>

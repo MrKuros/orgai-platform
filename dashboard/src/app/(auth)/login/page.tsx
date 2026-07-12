@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -28,6 +29,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const { login } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
   const {
@@ -43,7 +45,7 @@ export default function LoginPage() {
       setIsLoading(true);
       const res = await apiLogin(data);
       login(res.token, res.user, res.org);
-      // router.push is handled by middleware once session is set, but we can also do it contextually
+      router.push('/dashboard');
     } catch (error) {
       toast({
         title: 'Login Failed',

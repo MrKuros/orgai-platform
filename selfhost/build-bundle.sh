@@ -11,7 +11,10 @@ STAGE=$(mktemp -d)
 
 echo "==> Building images (version $VERSION)"
 docker build -f api/Dockerfile -t "orgai-api:$VERSION" .
-docker build --build-arg NEXT_PUBLIC_API_URL= -t "orgai-dashboard:$VERSION" dashboard/
+# API_PROXY_URL bakes the /v1 rewrite into the image (Next rewrites are build-time);
+# NEXT_PUBLIC_API_URL empty so the browser calls same-origin /v1/*.
+docker build --build-arg NEXT_PUBLIC_API_URL= --build-arg API_PROXY_URL=http://api:8080 \
+  -t "orgai-dashboard:$VERSION" dashboard/
 docker pull postgres:16-alpine
 
 echo "==> Saving images (this is the slow part)"
@@ -19,7 +22,11 @@ mkdir -p "$STAGE/$OUT"
 docker save "orgai-api:$VERSION" "orgai-dashboard:$VERSION" postgres:16-alpine \
   | gzip > "$STAGE/$OUT/orgai-images.tar.gz"
 
-cp selfhost/docker-compose.yml selfhost/README.md selfhost/install.sh selfhost/install.ps1 "$STAGE/$OUT/"
+# Ship a compose with no `build:` blocks — the bundle has no build context (.., ../dashboard),
+# and podman-compose would otherwise try to build when a pinned image tag is missing.
+awk '/^    build:/{skip=1; next} skip && /^    [a-z]/{skip=0} skip{next} {print}' \
+  selfhost/docker-compose.yml > "$STAGE/$OUT/docker-compose.yml"
+cp selfhost/README.md selfhost/install.sh selfhost/install.ps1 "$STAGE/$OUT/"
 mkdir -p "$STAGE/$OUT/hooks" && cp selfhost/hooks/pre-commit "$STAGE/$OUT/hooks/"
 # pin the version so `docker compose up` uses exactly these images
 sed "s/^#*ORGAI_VERSION=.*//" selfhost/.env.example > "$STAGE/$OUT/.env.example"

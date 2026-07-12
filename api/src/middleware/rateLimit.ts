@@ -20,6 +20,15 @@ export const authRateLimit = rateLimit({
   message,
 });
 
+// MCP transport endpoints: 120 req/min (agents make bursts of tool calls)
+export const mcpRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message,
+});
+
 // API key endpoints: 60 req/min
 export const apiKeyRateLimit = rateLimit({
   windowMs: 60 * 1000, // 1 minute

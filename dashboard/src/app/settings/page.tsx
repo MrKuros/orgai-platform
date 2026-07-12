@@ -1,11 +1,11 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import useSWR from 'swr';
-import { Settings, Shield, AlertCircle, CheckCircle2, Wand2 } from 'lucide-react';
+import { Settings, Shield, AlertCircle, CheckCircle2, Wand2, Lock } from 'lucide-react';
 
-import { useAuth } from '@/lib/auth';
+import { useAuth, useRole } from '@/lib/auth';
 import { fetcher, updateOrg, getSsoConfig, saveSsoConfig, testSsoConnection, ApiError } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { AppLayout } from '@/components/layout/app-layout';
@@ -19,7 +19,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 
 export default function SettingsPage() {
-  const { currentOrg } = useAuth();
+  const { currentOrg, updateCurrentOrg } = useAuth();
+  const { canManageOrg } = useRole();
   const { toast } = useToast();
 
   const { data: ssoData, mutate: mutateSso } = useSWR<any>(
@@ -41,13 +42,30 @@ export default function SettingsPage() {
   const [isSavingSso, setIsSavingSso] = useState(false);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
 
+  // Prefill org name once it loads (empty on hard reload before context hydrates)
+  useEffect(() => {
+    if (orgData?.org?.name) setOrgName(orgData.org.name);
+  }, [orgData?.org?.name]);
+
+  // Prefill SSO inputs from saved config when it arrives
+  useEffect(() => {
+    const cfg = ssoData?.ssoConfig;
+    if (cfg) {
+      setSsoProvider(cfg.provider || 'workos');
+      setWorkosOrgId(cfg.workosOrgId || '');
+      setConnectionId(cfg.connectionId || '');
+    }
+  }, [ssoData?.ssoConfig]);
+
   const handleUpdateOrg = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentOrg || !orgName.trim()) return;
 
     setIsUpdatingOrg(true);
     try {
-      await updateOrg(currentOrg.id, { name: orgName.trim() });
+      const { org } = await updateOrg(currentOrg.id, { name: orgName.trim() });
+      updateCurrentOrg(org); // sync context + localStorage so sidebar updates immediately
+      mutateOrgData();
       toast({ title: 'Organization name updated' });
     } catch (error) {
       toast({
@@ -142,6 +160,16 @@ export default function SettingsPage() {
           description="Manage your organization settings and integrations."
         />
 
+        {!canManageOrg ? (
+          <Card>
+            <CardContent className="flex items-center gap-3 py-8">
+              <Lock className="h-5 w-5 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                Only organization admins can change these settings. Contact an admin for access.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
         <div className="space-y-8">
           {/* Organization Settings */}
           <Card>
@@ -233,7 +261,7 @@ export default function SettingsPage() {
                       <div className="space-y-2">
                         <Label htmlFor="provider">Provider</Label>
                         <Select value={ssoProvider} onValueChange={setSsoProvider}>
-                          <SelectTrigger>
+                          <SelectTrigger id="provider">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -298,7 +326,7 @@ export default function SettingsPage() {
                       <div className="space-y-2">
                         <Label htmlFor="provider">Provider</Label>
                         <Select value={ssoProvider} onValueChange={setSsoProvider}>
-                          <SelectTrigger>
+                          <SelectTrigger id="provider">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -354,6 +382,7 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </div>
+        )}
       </div>
     </AppLayout>
   );

@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { validate } from '../middleware/validate';
 import { prisma } from '../lib/prisma';
-import { requireApiKey } from '../middleware/auth';
+import { requireApiKey, requireOrgAccess } from '../middleware/auth';
 import { authOrApiKey } from '../middleware/authOrApiKey';
 import { writeAuditLog } from '../services/audit';
 import { dispatchWebhook } from '../services/webhook';
@@ -121,8 +121,9 @@ export async function resolveRolePolicies(orgId: string, roleName: string) {
  *       404:
  *         description: Role not found
  */
-resolveRouter.get('/:orgId/resolve/:roleName', authOrApiKey, async (req, res) => {
-  const { roleName, orgId } = req.params;
+resolveRouter.get('/:orgId/resolve/:roleName', authOrApiKey, requireOrgAccess, async (req, res) => {
+  const { roleName } = req.params;
+  const orgId = req.org!.id;
 
   const responseData = await resolveRolePolicies(orgId, roleName);
 

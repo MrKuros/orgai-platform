@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getMe } from './api';
+import { getMe, logout as apiLogout } from './api';
 import type { User, Organization, Membership } from './types';
 
 interface AuthContextType {
@@ -13,6 +13,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (token: string, user: User, org?: Organization) => void;
   logout: () => void;
+  updateCurrentOrg: (org: Organization) => void;
   isAuthenticated: boolean;
 }
 
@@ -24,6 +25,7 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   login: () => {},
   logout: () => {},
+  updateCurrentOrg: () => {},
   isAuthenticated: false,
 });
 
@@ -84,6 +86,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    // Best-effort server revoke; don't block local teardown on it.
+    apiLogout().catch(() => {});
     localStorage.removeItem('orgai_token');
     localStorage.removeItem('orgai_org');
     document.cookie = 'orgai_has_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
@@ -91,6 +95,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setCachedOrg(null);
     router.push('/login');
+  };
+
+  // Patch the org shown across the app (sidebar, settings) after a rename etc.
+  const updateCurrentOrg = (org: Organization) => {
+    localStorage.setItem('orgai_org', JSON.stringify(org));
+    setCachedOrg(org);
+    setUser((prev) => {
+      if (!prev?.memberships?.length) return prev;
+      return {
+        ...prev,
+        memberships: prev.memberships.map((m) =>
+          m.orgId === org.id ? { ...m, org } : m
+        ),
+      };
+    });
   };
 
   const currentMembership = user?.memberships?.[0] || null;
@@ -106,6 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         login,
         logout,
+        updateCurrentOrg,
         isAuthenticated: !!token && !!user,
       }}
     >
@@ -115,3 +135,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 export const useAuth = () => useContext(AuthContext);
+
+// Role gating for mutating UI. ORG_ADMIN can do everything; POLICY_ADMIN manages
+// policies/roles; MEMBER is view-only. ponytail: coarse buckets, split further if
+// the backend ever gets finer permissions.
+export function useRole() {
+  const { currentMembership } = useAuth();
+  const role = currentMembership?.role ?? null;
+  return {
+    role,
+    isOrgAdmin: role === 'ORG_ADMIN',
+    // policies & roles editable by both admin tiers
+    canManagePolicies: role === 'ORG_ADMIN' || role === 'POLICY_ADMIN',
+    // team, api keys, org/SSO settings are org-admin only
+    canManageOrg: role === 'ORG_ADMIN',
+  };
+}

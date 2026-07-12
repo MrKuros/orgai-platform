@@ -24,10 +24,44 @@ app.use(cors({
 
 app.use(express.json());
 
-const transports: Record<string, SSEServerTransport> = {};
+type SseEntry = { transport: SSEServerTransport; lastSeen: number };
+const transports: Record<string, SseEntry> = {};
+
+// Session hygiene: killed agents never close cleanly, so sweep idle sessions
+// and cap the map so it can't grow unbounded.
+const SESSION_IDLE_MS = 30 * 60 * 1000;
+const MAX_SESSIONS = 500;
+
+function sweepIdle() {
+  const cutoff = Date.now() - SESSION_IDLE_MS;
+  for (const [id, e] of Object.entries(transports)) {
+    if (e.lastSeen < cutoff) {
+      try { e.transport.close?.(); } catch { /* already gone */ }
+      delete transports[id];
+    }
+  }
+}
+
+function evictOldestIfFull() {
+  const ids = Object.keys(transports);
+  if (ids.length < MAX_SESSIONS) return;
+  let oldest: string | null = null;
+  for (const id of ids) {
+    if (!oldest || transports[id].lastSeen < transports[oldest].lastSeen) oldest = id;
+  }
+  if (oldest) {
+    try { transports[oldest].transport.close?.(); } catch { /* already gone */ }
+    delete transports[oldest];
+  }
+}
+
+const sweepInterval = setInterval(sweepIdle, 5 * 60 * 1000);
+sweepInterval.unref?.();
 
 let lazyOrgCache: any = null;
 let lazyOrgError: string | null = null;
+let lazyOrgAt = 0;
+const LAZY_TTL_MS = 60_000; // retry after a transient failure / refresh cache
 
 app.get("/health", async (req, res) => {
   const isApiMode = !!process.env.COMPLY_API_KEY;
@@ -35,6 +69,10 @@ app.get("/health", async (req, res) => {
     return res.json({ status: "ok", version: "0.3.0", mode: "standalone", orgName: null });
   }
 
+  if (Date.now() - lazyOrgAt > LAZY_TTL_MS) {
+    lazyOrgCache = null;
+    lazyOrgError = null;
+  }
   if (!lazyOrgCache && !lazyOrgError) {
     try {
       const client = new OrgAIClient();
@@ -42,6 +80,7 @@ app.get("/health", async (req, res) => {
     } catch (e: any) {
       lazyOrgError = e.message;
     }
+    lazyOrgAt = Date.now();
   }
 
   if (lazyOrgError) {
@@ -52,11 +91,13 @@ app.get("/health", async (req, res) => {
 });
 
 app.get("/sse", async (req: Request, res: Response) => {
+  sweepIdle();
+  evictOldestIfFull();
   const server = createServer();
   const transport = new SSEServerTransport("/messages", res as any);
-  
-  transports[transport.sessionId] = transport;
-  
+
+  transports[transport.sessionId] = { transport, lastSeen: Date.now() };
+
   res.on("close", () => {
     delete transports[transport.sessionId];
   });
@@ -66,10 +107,13 @@ app.get("/sse", async (req: Request, res: Response) => {
 
 app.post("/messages", async (req: Request, res: Response) => {
   const sessionId = req.query.sessionId as string;
-  const transport = transports[sessionId];
+  const entry = transports[sessionId];
 
-  if (transport) {
-    await transport.handlePostMessage(req as any, res as any);
+  if (entry) {
+    entry.lastSeen = Date.now();
+    // Pass the parsed body: express.json() already drained the stream, so the
+    // SDK's getRawBody() would 400 on an empty stream without it.
+    await entry.transport.handlePostMessage(req as any, res as any, req.body);
   } else {
     res.status(404).send("Session not found");
   }

@@ -65,10 +65,55 @@ export async function requireApiKey(req: Request, res: Response, next: NextFunct
   }
 }
 
+/**
+ * Org-scoping guard for routes behind `authOrApiKey` that don't require a
+ * specific membership role. API keys must belong to params.orgId; JWT users
+ * must be a member of params.orgId. Sets req.org/req.membership.
+ */
+export async function requireOrgAccess(req: Request, res: Response, next: NextFunction) {
+  try {
+    const orgId = req.params.orgId;
+    if (!orgId) {
+      throw new AppError(400, 'ERROR', 'Bad Request: Missing orgId');
+    }
+
+    if (req.apiKeyRecord) {
+      if (req.org?.id !== orgId) {
+        throw new AppError(403, 'FORBIDDEN', 'Forbidden: API key does not belong to this org');
+      }
+      return next();
+    }
+
+    if (!req.user) {
+      throw new AppError(401, 'ERROR', 'Unauthorized: User context missing');
+    }
+
+    const membership = await prisma.membership.findUnique({
+      where: { orgId_userId: { orgId, userId: req.user.id } },
+      include: { org: true }
+    });
+
+    if (!membership) {
+      throw new AppError(403, 'ERROR', 'Forbidden: Not a member of this organization');
+    }
+
+    req.membership = membership;
+    req.org = membership.org;
+    next();
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'INTERNAL_ERROR', 'Internal server error checking org access');
+  }
+}
+
 export function requireOrgRole(...roles: MembershipRole[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (req.apiKeyRecord) {
+        // API keys are scoped to a single org — reject cross-org use.
+        if (req.params.orgId && req.org?.id !== req.params.orgId) {
+          throw new AppError(403, 'FORBIDDEN', 'Forbidden: API key does not belong to this org');
+        }
         return next();
       }
 

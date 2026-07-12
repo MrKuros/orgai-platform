@@ -85,12 +85,28 @@ export function ViolationFeed() {
     setViolations(prev => prev.filter((_, i) => i !== index));
   };
 
-  if (!currentOrg || isMinimized) {
+  if (!currentOrg) {
     return null;
   }
 
+  // Reopen pill when minimized
+  if (isMinimized) {
+    return (
+      <button
+        onClick={() => setIsMinimized(false)}
+        className="fixed bottom-4 right-4 z-20 flex items-center gap-2 rounded-full border bg-card px-4 py-2 shadow-lg hover:bg-muted/50 transition-colors"
+      >
+        <ShieldAlert className="h-4 w-4 text-destructive" />
+        <span className="text-sm font-medium">Live Violations</span>
+        <Badge variant={isConnected ? 'default' : 'destructive'} className="text-xs">
+          {isConnected ? 'Live' : 'Off'}
+        </Badge>
+      </button>
+    );
+  }
+
   return (
-    <div className="fixed bottom-4 right-4 w-96 max-h-96 overflow-hidden rounded-lg border bg-card shadow-lg">
+    <div className="fixed bottom-4 right-4 z-20 w-[calc(100vw-2rem)] sm:w-96 max-h-96 overflow-hidden rounded-lg border bg-card shadow-lg">
       <div className="flex items-center justify-between border-b px-4 py-2 bg-muted/50">
         <div className="flex items-center gap-2">
           <ShieldAlert className="h-4 w-4 text-destructive" />

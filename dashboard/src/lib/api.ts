@@ -40,7 +40,10 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
   });
 
   if (!response.ok) {
-    if (response.status === 401 && typeof window !== 'undefined') {
+    // Real session-expiry 401s bounce to login. Auth endpoints (login/signup/etc.)
+    // 401 on bad creds — let those throw so the form keeps its state and shows the error.
+    const isAuthEndpoint = endpoint.startsWith('/auth/');
+    if (response.status === 401 && !isAuthEndpoint && typeof window !== 'undefined') {
       localStorage.removeItem('orgai_token');
       document.cookie = 'orgai_has_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
       window.location.href = '/login';

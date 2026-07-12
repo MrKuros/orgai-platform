@@ -1,7 +1,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { createRole, createPolicy, inviteMember, createApiKey, ApiError } from '@/lib/api';
@@ -32,6 +32,7 @@ export default function SetupWizard() {
     { id: '4', name: 'junior', displayName: 'Junior', inheritsFromId: '2' },
   ]);
   const [createdRoles, setCreatedRoles] = useState<Role[]>([]);
+  const [createdPolicyNames, setCreatedPolicyNames] = useState<string[]>([]);
 
   // Step 3 State (Policies)
   const [policies, setPolicies] = useState([
@@ -73,10 +74,15 @@ export default function SetupWizard() {
   const [invites, setInvites] = useState<{email: string, role: string}[]>([]);
   const [apiKey, setApiKey] = useState<string | null>(null);
 
-  if (authLoading) return <div className="flex h-screen items-center justify-center"><Spinner className="h-8 w-8" /></div>;
-  if (!user || !currentOrg) {
-    router.push('/login');
-    return null;
+  // Redirect unauthenticated users from an effect, never during render.
+  useEffect(() => {
+    if (!authLoading && (!user || !currentOrg)) {
+      router.push('/login');
+    }
+  }, [authLoading, user, currentOrg, router]);
+
+  if (authLoading || !user || !currentOrg) {
+    return <div className="flex h-screen items-center justify-center"><Spinner className="h-8 w-8" /></div>;
   }
 
   const handleNextStep1 = () => setStep(2);
@@ -89,13 +95,19 @@ export default function SetupWizard() {
     
     setIsSubmitting(true);
     try {
-      const created: Role[] = [];
+      // Resume from already-created roles so a retry after a partial failure
+      // skips existing ones instead of creating duplicates. Match by slug (name).
+      const created: Role[] = [...createdRoles];
       const idMap = new Map<string, string>(); // maps temp id -> real id
+      for (const r of roles) {
+        const existing = created.find(c => c.name === r.name);
+        if (existing) idMap.set(r.id, existing.id);
+      }
 
       // Create roots first, then children
-      const toCreate = [...roles];
+      const toCreate = roles.filter(r => !idMap.has(r.id));
       let iterations = 0;
-      
+
       while (toCreate.length > 0 && iterations < 100) {
         iterations++;
         for (let i = 0; i < toCreate.length; i++) {
@@ -109,6 +121,7 @@ export default function SetupWizard() {
             });
             idMap.set(role.id, res.role.id);
             created.push(res.role);
+            setCreatedRoles([...created]); // persist progress for retry
             toCreate.splice(i, 1);
             i--;
           }
@@ -116,12 +129,12 @@ export default function SetupWizard() {
       }
 
       setCreatedRoles(created);
-      
+
       // Auto-assign CTO role to first policy as default
       if (created.length > 0) {
         setPolicies(policies.map(p => ({ ...p, roleIds: [created[0].id] })));
       }
-      
+
       setStep(3);
     } catch (error) {
       toast({ title: 'Error creating roles', description: error instanceof ApiError ? error.message : 'Unknown error', variant: 'destructive' });
@@ -132,8 +145,11 @@ export default function SetupWizard() {
 
   const handleNextStep3 = async () => {
     setIsSubmitting(true);
+    // Track created policy names so a retry after a partial failure skips existing ones.
+    const done = [...createdPolicyNames];
     try {
       for (const policy of policies) {
+        if (done.includes(policy.name)) continue;
         await createPolicy(currentOrg.id, {
           name: policy.name,
           rule: policy.rule,
@@ -143,10 +159,12 @@ export default function SetupWizard() {
           severity: policy.severity,
           roleIds: policy.roleIds,
         });
+        done.push(policy.name);
+        setCreatedPolicyNames([...done]);
       }
       setStep(4);
     } catch (error) {
-      toast({ title: 'Error creating policies', description: error instanceof ApiError ? error.message : 'Unknown error', variant: 'destructive' });
+      toast({ title: 'Error creating policies', description: error instanceof ApiError ? `${error.message} — created ${done.length}/${policies.length}. Fix and retry to continue.` : 'Unknown error', variant: 'destructive' });
     } finally {
       setIsSubmitting(false);
     }
@@ -232,7 +250,7 @@ export default function SetupWizard() {
                   <div className="grid grid-cols-3 gap-3 flex-1">
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Name (slug)</Label>
-                      <Input value={role.name} onChange={e => {
+                      <Input aria-label={`Role ${idx + 1} name (slug)`} value={role.name} onChange={e => {
                         const newRoles = [...roles];
                         newRoles[idx].name = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
                         setRoles(newRoles);
@@ -240,7 +258,7 @@ export default function SetupWizard() {
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Display Name</Label>
-                      <Input value={role.displayName} onChange={e => {
+                      <Input aria-label={`Role ${idx + 1} display name`} value={role.displayName} onChange={e => {
                         const newRoles = [...roles];
                         newRoles[idx].displayName = e.target.value;
                         setRoles(newRoles);
@@ -253,7 +271,7 @@ export default function SetupWizard() {
                         newRoles[idx].inheritsFromId = val === 'none' ? '' : val;
                         setRoles(newRoles);
                       }}>
-                        <SelectTrigger>
+                        <SelectTrigger aria-label={`Role ${idx + 1} inherits from`}>
                           <SelectValue placeholder="None" />
                         </SelectTrigger>
                         <SelectContent>
@@ -300,7 +318,7 @@ export default function SetupWizard() {
                   <div className="grid grid-cols-2 gap-4 mr-8">
                     <div className="space-y-2">
                       <Label>Policy Name</Label>
-                      <Input value={policy.name} onChange={e => {
+                      <Input aria-label={`Policy ${idx + 1} name`} value={policy.name} onChange={e => {
                         const newPol = [...policies];
                         newPol[idx].name = e.target.value;
                         setPolicies(newPol);
@@ -313,7 +331,7 @@ export default function SetupWizard() {
                         newPol[idx].roleIds = val === 'none' ? [] : [val];
                         setPolicies(newPol);
                       }}>
-                        <SelectTrigger title="Type the exact role system name (slug) to bind this policy to. E.g. &quot;senior-dev&quot;. Leave blank for &quot;all roles&quot;."><SelectValue placeholder="Select role" /></SelectTrigger>
+                        <SelectTrigger aria-label={`Policy ${idx + 1} bound role`}><SelectValue placeholder="Select role" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">None</SelectItem>
                           {createdRoles.map(r => <SelectItem key={r.id} value={r.id}>{r.displayName}</SelectItem>)}
@@ -323,7 +341,7 @@ export default function SetupWizard() {
                   </div>
                   <div className="space-y-2">
                     <Label>Rule</Label>
-                    <Input value={policy.rule} onChange={e => {
+                    <Input aria-label={`Policy ${idx + 1} rule`} value={policy.rule} onChange={e => {
                         const newPol = [...policies];
                         newPol[idx].rule = e.target.value;
                         setPolicies(newPol);
@@ -365,13 +383,13 @@ export default function SetupWizard() {
                 )}
                 <div className="flex gap-2 items-end">
                   <div className="space-y-2 flex-1">
-                    <Label>Email</Label>
-                    <Input placeholder="colleague@company.com" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />
+                    <Label htmlFor="inviteEmail">Email</Label>
+                    <Input id="inviteEmail" placeholder="colleague@company.com" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />
                   </div>
                   <div className="space-y-2 w-[150px]">
-                    <Label>Org Role</Label>
+                    <Label htmlFor="inviteRole">Org Role</Label>
                     <Select value={inviteRole} onValueChange={(val: any) => setInviteRole(val)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectTrigger id="inviteRole"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="MEMBER">Member</SelectItem>
                         <SelectItem value="POLICY_ADMIN">Policy Admin</SelectItem>

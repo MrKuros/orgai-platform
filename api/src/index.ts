@@ -5,7 +5,7 @@ import cors from 'cors';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import swaggerUi from 'swagger-ui-express';
-import { globalRateLimit, authRateLimit, apiKeyRateLimit } from './middleware/rateLimit';
+import { globalRateLimit, authRateLimit, apiKeyRateLimit, mcpRateLimit } from './middleware/rateLimit';
 import { errorHandler } from './middleware/errorHandler';
 import { authRouter } from './routes/auth';
 import { orgsRouter } from './routes/orgs';
@@ -26,14 +26,19 @@ import { swaggerSpec } from './swagger';
 
 const app = express();
 
+// Behind Render/proxy: trust N hops so rate limits see the real client IP.
+app.set('trust proxy', process.env.TRUST_PROXY ? Number(process.env.TRUST_PROXY) : 1);
+
 // Security
 app.use(helmet());
+// Credentialed CORS must pin to exact origins — no wildcards. Dashboard origin
+// comes from env; localhost is allowed for dev only.
+const corsOrigins = [process.env.CORS_ORIGIN || process.env.DASHBOARD_URL || 'https://app.orgai.dev'];
+if (process.env.NODE_ENV !== 'production') {
+  corsOrigins.push('http://localhost:3000');
+}
 app.use(cors({
-  origin: [
-    process.env.CORS_ORIGIN || 'http://localhost:3000',
-    'https://app.orgai.dev',
-    /\.vercel\.app$/
-  ],
+  origin: corsOrigins,
   credentials: true
 }));
 
@@ -42,7 +47,10 @@ app.use(compression());
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
-// MCP SSE transport (must be after body parsing middleware)
+// MCP SSE transport (must be after body parsing middleware).
+// Rate-limit before mounting: these endpoints run tools on the server's own
+// COMPLY_API_KEY in API mode, so an unlimited caller could drain the org API.
+app.use(['/mcp', '/mcp/sse', '/mcp/messages'], mcpRateLimit);
 mountMcpRoutes(app);
 
 // Rate limiting

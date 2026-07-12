@@ -35,7 +35,7 @@ function getConfigSnippet(apiKey: string | null, ide: Ide): string {
           orgai: {
             url,
             env: {
-              ORGAI_API_KEY: key,
+              COMPLY_API_KEY: key,
             },
           },
         },
@@ -47,7 +47,7 @@ function getConfigSnippet(apiKey: string | null, ide: Ide): string {
           orgai: {
             url,
             env: {
-              ORGAI_API_KEY: key,
+              COMPLY_API_KEY: key,
             },
           },
         },
@@ -59,7 +59,7 @@ function getConfigSnippet(apiKey: string | null, ide: Ide): string {
           orgai: {
             url,
             env: {
-              ORGAI_API_KEY: key,
+              COMPLY_API_KEY: key,
             },
           },
         },
@@ -71,7 +71,7 @@ function getConfigSnippet(apiKey: string | null, ide: Ide): string {
           orgai: {
             url,
             env: {
-              ORGAI_API_KEY: key,
+              COMPLY_API_KEY: key,
             },
           },
         },
@@ -83,7 +83,7 @@ function getConfigSnippet(apiKey: string | null, ide: Ide): string {
           orgai: {
             url,
             env: {
-              ORGAI_API_KEY: key,
+              COMPLY_API_KEY: key,
             },
           },
         },

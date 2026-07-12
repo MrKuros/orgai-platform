@@ -46,6 +46,13 @@ services:
       # No RESEND_API_KEY: invite/reset emails are printed to `docker compose logs api`
     ports:
       - "${API_PORT:-8080}:8080"
+    healthcheck:
+      # busybox wget (present in node:20-alpine) — non-zero exit if /health is down
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
 
   dashboard:
     image: orgai-dashboard:${ORGAI_VERSION:-latest}
@@ -58,7 +65,10 @@ services:
         API_PROXY_URL: http://api:8080
     restart: unless-stopped
     depends_on:
-      - api
+      # wait for the api to pass its healthcheck (migrations done) before serving,
+      # so the dashboard never proxies /v1/* to a not-yet-ready api
+      api:
+        condition: service_healthy
     ports:
       - "${DASHBOARD_PORT:-3000}:3000"
 

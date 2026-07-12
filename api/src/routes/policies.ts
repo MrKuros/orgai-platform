@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { validate } from '../middleware/validate';
 import { prisma } from '../lib/prisma';
-import { requireAuth, requireOrgRole } from '../middleware/auth';
+import { requireAuth, requireOrgRole, requireOrgAccess } from '../middleware/auth';
 import { authOrApiKey } from '../middleware/authOrApiKey';
 import { writeAuditLog } from '../services/audit';
 import { dispatchWebhook } from '../services/webhook';
@@ -11,6 +11,23 @@ import { invalidateResolveCache } from './resolve';
 import { assertWithinLimit, limitsFor } from '../lib/plans';
 
 export const policiesRouter = Router();
+
+// Validates a regex evaluator: caps length/flags (ReDoS mitigation) and
+// ensures it compiles. Throws 400 on failure. Skips non-regex evaluators.
+function assertValidEvaluator(evaluatorType: string | undefined, pattern: unknown, flags: unknown) {
+  if (evaluatorType !== 'regex' || pattern == null) return;
+  if (typeof pattern !== 'string' || pattern.length > 500) {
+    throw new AppError(400, 'INVALID_PATTERN', 'evaluatorPattern must be a string of at most 500 characters');
+  }
+  if (flags != null && (typeof flags !== 'string' || flags.length > 10)) {
+    throw new AppError(400, 'INVALID_PATTERN', 'evaluatorFlags must be a string of at most 10 characters');
+  }
+  try {
+    new RegExp(pattern, (flags as string) || '');
+  } catch (e: any) {
+    throw new AppError(400, 'INVALID_PATTERN', `Invalid regex pattern: ${e.message}`);
+  }
+}
 
 const testPolicySchema = z.object({
   evaluatorType: z.enum(['regex', 'command']),
@@ -59,9 +76,9 @@ policiesRouter.post('/:orgId/policies/test', requireAuth, requireOrgRole('POLICY
  *       200:
  *         description: List of policies
  */
-policiesRouter.get('/:orgId/policies', authOrApiKey, async (req, res) => {
+policiesRouter.get('/:orgId/policies', authOrApiKey, requireOrgAccess, async (req, res) => {
   const policies = await prisma.policy.findMany({
-    where: { orgId: req.params.orgId },
+    where: { orgId: req.org!.id },
     include: { bindings: true }
   });
   res.json({ policies });
@@ -132,8 +149,18 @@ const createPolicySchema = z.object({
 policiesRouter.post('/:orgId/policies', requireAuth, requireOrgRole('POLICY_ADMIN', 'ORG_ADMIN'), validate(createPolicySchema), async (req, res) => {
   const { roleIds, ...policyData } = req.body;
 
+  assertValidEvaluator(policyData.evaluatorType, policyData.evaluatorPattern, policyData.evaluatorFlags);
+
   const policyCount = await prisma.policy.count({ where: { orgId: req.org!.id } });
   assertWithinLimit(policyCount, limitsFor(req.org!.plan).policies, 'Policy', req.org!.plan);
+
+  // Verify all roleIds belong to this org before binding.
+  if (roleIds.length > 0) {
+    const owned = await prisma.role.count({ where: { id: { in: roleIds }, orgId: req.org!.id } });
+    if (owned !== roleIds.length) {
+      throw new AppError(400, 'ERROR', 'One or more roleIds do not belong to this organization');
+    }
+  }
 
   const policy = await prisma.$transaction(async (tx) => {
     const newPolicy = await tx.policy.create({
@@ -244,6 +271,12 @@ policiesRouter.patch('/:orgId/policies/:policyId', requireAuth, requireOrgRole('
   if (!currentPolicy) {
     throw new AppError(404, 'NOT_FOUND', 'Policy not found');
   }
+
+  // Validate against effective (post-merge) evaluator values.
+  const effType = req.body.evaluatorType ?? currentPolicy.evaluatorType;
+  const effPattern = 'evaluatorPattern' in req.body ? req.body.evaluatorPattern : currentPolicy.evaluatorPattern;
+  const effFlags = 'evaluatorFlags' in req.body ? req.body.evaluatorFlags : currentPolicy.evaluatorFlags;
+  assertValidEvaluator(effType, effPattern, effFlags);
 
   const policy = await prisma.$transaction(async (tx) => {
     await tx.policyVersion.create({

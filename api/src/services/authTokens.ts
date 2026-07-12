@@ -47,10 +47,15 @@ export async function consumeAuthToken(raw: string) {
     throw new AppError(400, 'INVALID_TOKEN', 'This link is invalid or has expired. Request a new one.');
   }
 
-  await prisma.authToken.update({
-    where: { id: record.id },
+  // Atomically claim the token: only one racer can flip usedAt from null.
+  const claimed = await prisma.authToken.updateMany({
+    where: { id: record.id, usedAt: null },
     data: { usedAt: new Date() }
   });
+
+  if (claimed.count === 0) {
+    throw new AppError(400, 'INVALID_TOKEN', 'This link is invalid or has expired. Request a new one.');
+  }
 
   return record;
 }

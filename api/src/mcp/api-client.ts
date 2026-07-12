@@ -23,6 +23,7 @@ export class OrgAIClient {
     }
     const res = await fetch(`${this.apiUrl}${endpoint}`, {
       ...options,
+      signal: options.signal ?? AbortSignal.timeout(10_000),
       headers: {
         'x-api-key': this.apiKey,
         'Content-Type': 'application/json',

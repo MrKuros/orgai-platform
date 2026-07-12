@@ -5,11 +5,16 @@ import { PolicyRole, PolicyConfig, ResolvedPolicy, Policy } from './types/policy
 
 export { PolicyRole as PolicyEntry, PolicyConfig, ResolvedPolicy };
 
+// Module-level TTL cache keyed by policyUrl. Tools build a fresh PolicyEngine
+// per call, so a per-instance cache would never hit and re-fetch every time.
+const REMOTE_CACHE_TTL_MS = 60_000;
+const remoteCache = new Map<string, { config: PolicyConfig; at: number }>();
+
 export class PolicyEngine {
   private config: PolicyConfig | null = null;
   private resolvedPolicies: ResolvedPolicy[] = [];
   private systemPrompt: string = '';
-  private cachedRemoteConfig: PolicyConfig | null = null;
+  private policySource: string | null = null;
   private opts: {
     policyUrl?: string;
     authHeader?: string;
@@ -31,24 +36,40 @@ export class PolicyEngine {
   public async load(): Promise<void> {
     const { policyUrl, authHeader, workspaceRoot, bundledPolicyPath, logger } = this.opts;
 
-    // 1. Try Remote URL if configured
+    // 1. Try Remote URL if configured.
+    // A configured URL is authoritative: if it's set we must serve THAT
+    // ruleset or nothing. Falling back to bundled demo policies here would
+    // enforce the wrong rules, so on fetch/validation failure we fail closed
+    // (isLoaded() stays false) instead of dropping to a weaker source.
     if (policyUrl && policyUrl.trim().length > 0) {
-      if (this.cachedRemoteConfig) {
+      const url = policyUrl.trim();
+      const cached = remoteCache.get(url);
+      if (cached && Date.now() - cached.at < REMOTE_CACHE_TTL_MS) {
         logger?.('[Comply] Policies loaded from cache');
-        this.config = this.cachedRemoteConfig;
+        this.config = cached.config;
+        this.policySource = `remote:${url}`;
         return;
       }
 
       try {
-        const fetched = await this.fetchRemote(policyUrl.trim(), authHeader);
-        if (fetched) {
-          logger?.(`[Comply] Policies loaded from remote: ${policyUrl}`);
-          this.cachedRemoteConfig = fetched;
-          this.config = fetched;
-          return;
+        const fetched = await this.fetchRemote(url, authHeader);
+        if (!fetched || !this.validateSchema(fetched)) {
+          throw new Error('remote config missing or failed schema validation');
         }
+        logger?.(`[Comply] Policies loaded from remote: ${url}`);
+        remoteCache.set(url, { config: fetched, at: Date.now() });
+        this.config = fetched;
+        this.policySource = `remote:${url}`;
+        return;
       } catch (e: any) {
-        logger?.(`[Comply] Remote policy fetch failed: ${e.message}, using local fallback`);
+        // Fail closed: a configured URL that is unreachable/invalid must not
+        // silently downgrade to bundled policies.
+        logger?.(`[Comply] Remote policy fetch failed: ${e.message}. Failing closed (configured policyUrl is authoritative).`);
+        this.config = null;
+        this.resolvedPolicies = [];
+        this.systemPrompt = '';
+        this.policySource = null;
+        return;
       }
     }
 
@@ -61,6 +82,7 @@ export class PolicyEngine {
         const parsed = JSON.parse(raw) as PolicyConfig;
         if (this.validateSchema(parsed)) {
           this.config = parsed;
+          this.policySource = `workspace:${wsConfigPath}`;
           logger?.(`[Comply] Policies loaded from workspace: ${wsConfigPath}`);
           return;
         }
@@ -76,6 +98,7 @@ export class PolicyEngine {
         const parsed = JSON.parse(raw) as PolicyConfig;
         if (this.validateSchema(parsed)) {
           this.config = parsed;
+          this.policySource = `bundled:${bundledPolicyPath}`;
           logger?.(`[Comply] Policies loaded from bundled config: ${bundledPolicyPath}`);
           return;
         } else {
@@ -113,7 +136,12 @@ export class PolicyEngine {
   }
 
   public clearCache(): void {
-    this.cachedRemoteConfig = null;
+    remoteCache.clear();
+  }
+
+  /** Where load() sourced policies from (remote:/workspace:/bundled:), or null if none. */
+  public getPolicySource(): string | null {
+    return this.policySource;
   }
 
   private async fetchRemote(url: string, authHeader?: string): Promise<PolicyConfig | null> {
@@ -121,7 +149,7 @@ export class PolicyEngine {
     if (authHeader) {
       headers['Authorization'] = authHeader;
     }
-    const response = await fetch(url, { headers });
+    const response = await fetch(url, { headers, signal: AbortSignal.timeout(10_000) });
     if (!response.ok) {
       throw new Error(`Status: ${response.status}`);
     }
@@ -135,13 +163,23 @@ export class PolicyEngine {
   public resolve(role: string): void {
     if (!this.config) {return;}
 
-    // Update current role
-    this.config.currentUserRole = role;
-
     const roleMap = new Map<string, PolicyRole>();
     for (const entry of this.config.hierarchy) {
       roleMap.set(entry.role, entry);
     }
+
+    // Fail closed: an unknown role (e.g. a typo in COMPLY_USER_ROLE) would
+    // otherwise produce an empty chain -> 0 policies -> every check passes.
+    if (!roleMap.has(role)) {
+      throw new Error(
+        `Unknown role "${role}" — not present in the policy hierarchy. ` +
+        `Cannot enforce policies for an undefined role; do not proceed. ` +
+        `Known roles: ${[...roleMap.keys()].join(', ') || '(none)'}.`
+      );
+    }
+
+    // Update current role
+    this.config.currentUserRole = role;
 
     // Build chain from current role up to root
     const chain: PolicyRole[] = [];

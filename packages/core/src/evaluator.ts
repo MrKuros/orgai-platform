@@ -10,7 +10,9 @@ export interface EvalResult {
   setBy: string;
   description: string;
   suggestion: string;
-  line?: number;
+  // Line within the evaluated snippet/blob, NOT the real file line — the
+  // evaluator only sees the added content, not the whole file.
+  lineInSnippet?: number;
 }
 
 // Approved packages from the CTO policy
@@ -74,8 +76,16 @@ export class Evaluator {
 
     const newContent = this.extractNewFileContent(code, filePath);
 
-    // 1. Path traversal check (hardcoded system rule)
-    if (filePath.includes('..') || path.isAbsolute(filePath)) {
+    // 1. Path traversal check (hardcoded system rule).
+    // MCP agents (Claude Code) routinely pass absolute paths, so isAbsolute()
+    // alone would flag almost every real check. Only block when the path
+    // actually escapes its root via `..` — normalize() collapses a contained
+    // `..`, so a leftover `..` segment means it escaped.
+    const traversal = path
+      .normalize(filePath)
+      .split(/[\\/]/)
+      .includes('..');
+    if (traversal) {
       violations.push({
         passed: false,
         severity: 'error',
@@ -111,7 +121,7 @@ export class Evaluator {
           setBy: policy.setByDisplayName,
           description: `Policy violation detected in "${filePath}" for rule: ${policy.rule}`,
           suggestion: policy.fix_suggestion,
-          line: newContent.slice(0, match.index).split('\n').length,
+          lineInSnippet: newContent.slice(0, match.index).split('\n').length,
         });
       }
     }
@@ -138,11 +148,9 @@ export class Evaluator {
         // Future: move APPROVED_PACKAGES and DEV_SAFE_PACKAGES into the policy schema
         // as a new evaluator type: "allowlist" with a packages[] field
         if (policy.id === 'approved-packages-only') {
-          // Special case: package allowlist logic
-          const args = match[0].trim().split(/\s+/).slice(1); // skip 'npm install', etc
-          // We need all arguments from the command after the install/add keyword
-          // A simple regex match doesn't capture all trailing packages, so we re-parse the full command
-          
+          // Special case: package allowlist logic.
+          // A single regex match doesn't capture all trailing packages, so we
+          // re-parse the full command after the install/add keyword.
           let packages: string[] = [];
           if (/npm\s+(?:install|i|add)\s+/i.test(command)) {
             const m = command.match(/npm\s+(?:install|i|add)\s+(.+)/i);

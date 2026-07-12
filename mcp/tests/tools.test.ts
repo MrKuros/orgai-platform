@@ -47,7 +47,7 @@ describe("tools", () => {
       const result = await mockTools.check_compliance({ code: "const secret = '123'" });
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.passed).toBe(false);
-      expect(parsed.blockers).toHaveLength(1);
+      expect(parsed.blockerCount).toBe(1);
       expect(parsed.guidance).toMatch(/BLOCKED/);
     });
 
@@ -171,7 +171,7 @@ describe("tools", () => {
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.passed).toBe(false);
       expect(parsed.violations[0].policyName).toBe("no-hardcoded-secrets");
-      expect(parsed.blockers).toHaveLength(1);
+      expect(parsed.blockerCount).toBe(1);
     });
   });
 });

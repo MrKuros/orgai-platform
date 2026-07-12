@@ -6,7 +6,7 @@ import useSWR from 'swr';
 import { format } from 'date-fns';
 import { Key, Plus, Trash2, AlertTriangle, ChevronDown } from 'lucide-react';
 
-import { useAuth } from '@/lib/auth';
+import { useAuth, useRole } from '@/lib/auth';
 import { fetcher, createApiKey, deleteApiKey, ApiError } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { AppLayout } from '@/components/layout/app-layout';
@@ -23,7 +23,6 @@ import { Badge } from '@/components/ui/badge';
 
 type CreatePreset = 'vscode' | 'mcp' | null;
 
-const MCP_URL = process.env.NEXT_PUBLIC_MCP_URL || 'https://mcp.orgai.dev';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 const AGENTS = [
@@ -44,9 +43,18 @@ function formatDate(dateStr: string | null) {
 
 export default function ApiKeysPage() {
   const { currentOrg } = useAuth();
+  const { canManageOrg } = useRole();
   const { toast } = useToast();
 
-  const { data, mutate, isLoading } = useSWR<any>(
+  // Self-host MCP endpoint: same-origin /mcp/sse. Resolve on client to avoid hydration mismatch.
+  const [mcpUrl, setMcpUrl] = useState(
+    process.env.NEXT_PUBLIC_API_URL ? `${process.env.NEXT_PUBLIC_API_URL}/mcp/sse` : ''
+  );
+  useEffect(() => {
+    if (!process.env.NEXT_PUBLIC_API_URL) setMcpUrl(`${window.location.origin}/mcp/sse`);
+  }, []);
+
+  const { data, mutate, isLoading, error } = useSWR<any>(
     currentOrg ? `/orgs/${currentOrg.id}/api-keys` : null,
     fetcher
   );
@@ -143,9 +151,11 @@ export default function ApiKeysPage() {
           title="API Keys"
           description="Manage keys for the VS Code extension and other API consumers."
           action={
-            <Button onClick={() => openCreateDialog(null)}>
-              <Plus className="w-4 h-4 mr-2" /> New API Key
-            </Button>
+            canManageOrg ? (
+              <Button onClick={() => openCreateDialog(null)}>
+                <Plus className="w-4 h-4 mr-2" /> New API Key
+              </Button>
+            ) : undefined
           }
         />
 
@@ -171,7 +181,14 @@ export default function ApiKeysPage() {
           </div>
         )}
 
-        {isLoading ? (
+        {error ? (
+          <EmptyState
+            icon={<AlertTriangle className="w-10 h-10 text-destructive" />}
+            title="Couldn't load API keys"
+            description="Something went wrong fetching your API keys. Check your connection and try again."
+            action={<Button onClick={() => mutate()}>Retry</Button>}
+          />
+        ) : isLoading ? (
           <div className="flex justify-center p-12"><Spinner className="w-8 h-8" /></div>
         ) : apiKeys.length === 0 ? (
           <EmptyState
@@ -179,9 +196,11 @@ export default function ApiKeysPage() {
             title="No API keys yet"
             description="Create an API key to connect the VS Code extension or other integrations."
             action={
-              <Button onClick={() => openCreateDialog(null)}>
-                <Plus className="w-4 h-4 mr-2" /> Create API Key
-              </Button>
+              canManageOrg ? (
+                <Button onClick={() => openCreateDialog(null)}>
+                  <Plus className="w-4 h-4 mr-2" /> Create API Key
+                </Button>
+              ) : undefined
             }
           />
         ) : (
@@ -226,15 +245,17 @@ export default function ApiKeysPage() {
                         {formatDate(key.createdAt)}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => setKeyToDelete(key.id)}
-                          title="Revoke key"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {canManageOrg && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => setKeyToDelete(key.id)}
+                            title="Revoke key"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -283,11 +304,13 @@ export default function ApiKeysPage() {
                     <li>Set API URL to <code className="bg-muted px-1 rounded text-xs">{API_URL}</code></li>
                   </ol>
                 </div>
-                <div className="flex justify-end">
-                  <Button variant="outline" size="sm" onClick={() => openCreateDialog('vscode')}>
-                    <Plus className="w-4 h-4 mr-2" /> New VS Code Key
-                  </Button>
-                </div>
+                {canManageOrg && (
+                  <div className="flex justify-end">
+                    <Button variant="outline" size="sm" onClick={() => openCreateDialog('vscode')}>
+                      <Plus className="w-4 h-4 mr-2" /> New VS Code Key
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -301,9 +324,11 @@ export default function ApiKeysPage() {
                     Create a key with <code className="bg-muted px-1 rounded text-xs">check</code> and{' '}
                     <code className="bg-muted px-1 rounded text-xs">resolve</code> scopes.
                   </p>
-                  <Button variant="outline" size="sm" onClick={() => openCreateDialog('mcp')}>
-                    <Plus className="w-4 h-4 mr-2" /> New MCP Agent Key
-                  </Button>
+                  {canManageOrg && (
+                    <Button variant="outline" size="sm" onClick={() => openCreateDialog('mcp')}>
+                      <Plus className="w-4 h-4 mr-2" /> New MCP Agent Key
+                    </Button>
+                  )}
                 </div>
 
                 {/* Step 2 */}
@@ -317,7 +342,7 @@ export default function ApiKeysPage() {
                       <pre className="flex-1 text-sm font-mono text-left whitespace-pre">{`{
   "mcpServers": {
     "orgai": {
-      "url": "${MCP_URL}/sse",
+      "url": "${mcpUrl}",
       "env": {
         "COMPLY_API_KEY": "${newlyCreatedKey || 'your-api-key-here'}"
       }
@@ -328,7 +353,7 @@ export default function ApiKeysPage() {
                         value={`{
   "mcpServers": {
     "orgai": {
-      "url": "${MCP_URL}/sse",
+      "url": "${mcpUrl}",
       "env": {
         "COMPLY_API_KEY": "${newlyCreatedKey || 'your-api-key-here'}"
       }
@@ -362,15 +387,15 @@ export default function ApiKeysPage() {
                     Step 4 — Self-hosted MCP
                   </summary>
                   <div className="mt-3 pl-6 space-y-2 text-sm text-muted-foreground">
-                    <p>If you&apos;re running the MCP server locally or self-hosted, replace the URL with your own:</p>
+                    <p>The MCP server is served from this deployment. Agents that support streamable HTTP can point directly at:</p>
                     <div className="bg-muted/50 rounded-lg p-3 space-y-2">
                       <div className="flex items-center gap-2">
-                        <code className="bg-muted px-1 rounded text-xs">http://localhost:3001/sse</code>
-                        <span className="text-xs text-muted-foreground">(local dev)</span>
+                        <code className="bg-muted px-1 rounded text-xs">{mcpUrl.replace('/mcp/sse', '/mcp')}</code>
+                        <span className="text-xs text-muted-foreground">(streamable HTTP)</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <code className="bg-muted px-1 rounded text-xs">https://your-domain.com/sse</code>
-                        <span className="text-xs text-muted-foreground">(self-hosted)</span>
+                        <code className="bg-muted px-1 rounded text-xs">{mcpUrl}</code>
+                        <span className="text-xs text-muted-foreground">(SSE)</span>
                       </div>
                     </div>
                   </div>

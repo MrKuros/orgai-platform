@@ -97,8 +97,11 @@ across restarts and updates.
 **Backup** (recommended, cron-able):
 
 ```bash
-docker compose exec db pg_dump -U orgai orgai > orgai-backup-$(date +%F).sql
+docker compose exec -T db pg_dump -U orgai orgai > orgai-backup-$(date +%F).sql
 ```
+
+(`-T` disables the pseudo-TTY — required under cron/CI, and it stops the dump
+being corrupted by CRLF line-ending translation.)
 
 **Restore:**
 
@@ -137,13 +140,24 @@ trail, whether or not the commit is blocked.
 
 ## 6. Updating
 
-When you receive a new bundle:
+Each bundle generates fresh random secrets. Your existing data (in the
+`orgai_pgdata` volume) is encrypted with the **original** `POSTGRES_PASSWORD`
+and `JWT_SECRET`, so a new bundle must reuse your existing `.env` — otherwise
+the API cannot open the database (crash-loop) and everyone is logged out.
+
+When you receive a new bundle, unpack it and **copy your current `.env` into the
+new folder first**:
 
 ```bash
-docker load -i orgai-images.tar.gz     # from the new bundle
-# update ORGAI_VERSION in .env to the new version number
-docker compose up -d                   # migrates the database automatically
+cp /path/to/old-bundle/.env .            # reuse your existing secrets
+docker load -i orgai-images.tar.gz       # from the new bundle
+# set ORGAI_VERSION in .env to the new version number (see .env.example footer)
+docker compose up -d                     # migrates the database automatically
 ```
+
+`install.sh` / `install.ps1` also detect this: if they find existing
+`orgai_pgdata` data but no `.env` in the folder, they abort and tell you to copy
+the previous `.env` in first.
 
 Your data is kept — database migrations run automatically on start.
 
@@ -151,10 +165,19 @@ Your data is kept — database migrations run automatically on start.
 
 Docker restarts the containers automatically after a reboot. Rootless Podman
 does not — either run `podman compose up -d` after a reboot, or (Linux)
-enable lingering + generate systemd units once:
+enable lingering + generate a systemd unit per container once. The compose
+project is named `orgai`, so the containers are `orgai-db-1`, `orgai-api-1`,
+`orgai-dashboard-1` (confirm with `podman ps --format '{{.Names}}'`).
+`podman generate systemd` takes one container name per call:
 
 ```bash
-podman generate systemd --new --files --name orgai-api orgai-db orgai-dashboard
+loginctl enable-linger "$USER"        # keep units running after logout
+podman generate systemd --new --files --name orgai-db-1
+podman generate systemd --new --files --name orgai-api-1
+podman generate systemd --new --files --name orgai-dashboard-1
+mkdir -p ~/.config/systemd/user && mv container-orgai-*.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now container-orgai-db-1 container-orgai-api-1 container-orgai-dashboard-1
 ```
 
 ## Troubleshooting

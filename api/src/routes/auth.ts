@@ -10,6 +10,7 @@ import { requireAuth, requireApiKey } from '../middleware/auth';
 import { writeAuditLog } from '../services/audit';
 import { createAuthToken, consumeAuthToken } from '../services/authTokens';
 import { sendPasswordResetEmail } from '../services/email';
+import { logger } from '../lib/logger';
 
 export const authRouter = Router();
 
@@ -373,6 +374,10 @@ authRouter.get('/sso/callback', async (req, res) => {
       org: { id: org.id, name: org.name, slug: org.slug }
     });
   } catch (error) {
+    // Preserve deliberate errors (404 org not found, etc.); only genuine
+    // WorkOS/unknown failures become a 500.
+    if (error instanceof AppError) throw error;
+    logger.error('SSO callback failed', { error });
     throw new AppError(500, 'ERROR', 'SSO login failed');
   }
 });

@@ -3,9 +3,9 @@ export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
 import useSWR from 'swr';
-import { Plus, Trash2, Pencil, Shield, ArrowRight, ShieldCheck, Search, Play } from 'lucide-react';
+import { Plus, Trash2, Pencil, Shield, ArrowRight, ShieldCheck, Search, Play, AlertTriangle } from 'lucide-react';
 
-import { useAuth } from '@/lib/auth';
+import { useAuth, useRole } from '@/lib/auth';
 import { fetcher, createPolicy, updatePolicy, deletePolicy, ApiError } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { AppLayout } from '@/components/layout/app-layout';
@@ -22,15 +22,17 @@ import { LiveEvaluatorPreview } from '@/components/live-evaluator-preview';
 
 export default function PoliciesPage() {
   const { currentOrg } = useAuth();
+  const { canManagePolicies } = useRole();
   const { toast } = useToast();
   
-  const { data: policiesData, mutate: mutatePolicies, isLoading: policiesLoading } = useSWR<any>(currentOrg ? `/orgs/${currentOrg.id}/policies` : null, fetcher);
-  const { data: rolesData, isLoading: rolesLoading } = useSWR<any>(currentOrg ? `/orgs/${currentOrg.id}/roles` : null, fetcher);
-  
+  const { data: policiesData, mutate: mutatePolicies, isLoading: policiesLoading, error: policiesError } = useSWR<any>(currentOrg ? `/orgs/${currentOrg.id}/policies` : null, fetcher);
+  const { data: rolesData, isLoading: rolesLoading, error: rolesError, mutate: mutateRoles } = useSWR<any>(currentOrg ? `/orgs/${currentOrg.id}/roles` : null, fetcher);
+
   const policies = policiesData?.policies || [];
   const roles = rolesData?.roles || [];
-  
+
   const isLoading = policiesLoading || rolesLoading;
+  const loadError = policiesError || rolesError;
 
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -107,28 +109,38 @@ export default function PoliciesPage() {
               <Button variant="outline" onClick={() => setIsEvaluatorOpen(true)}>
                 <Play className="w-4 h-4 mr-2" /> Evaluate
               </Button>
-              <Button onClick={() => setIsCreateOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" /> New Policy
-              </Button>
+              {canManagePolicies && (
+                <Button onClick={() => setIsCreateOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" /> New Policy
+                </Button>
+              )}
             </div>
           }
         />
 
-        {isLoading ? (
+        {loadError ? (
+          <EmptyState
+            icon={<AlertTriangle className="w-10 h-10 text-destructive" />}
+            title="Couldn't load policies"
+            description="Something went wrong fetching your policies. Check your connection and try again."
+            action={<Button onClick={() => { mutatePolicies(); mutateRoles(); }}>Retry</Button>}
+          />
+        ) : isLoading ? (
           <div className="flex justify-center p-12"><Spinner className="w-8 h-8" /></div>
         ) : policies.length === 0 ? (
           <EmptyState
             icon={<Shield className="w-10 h-10 text-muted-foreground" />}
             title="No policies defined"
             description="Create your first policy to establish guidelines for your AI agents."
-            action={<Button onClick={() => setIsCreateOpen(true)}><Plus className="w-4 h-4 mr-2" /> Create Policy</Button>}
+            action={canManagePolicies ? <Button onClick={() => setIsCreateOpen(true)}><Plus className="w-4 h-4 mr-2" /> Create Policy</Button> : undefined}
           />
         ) : (
           <div className="space-y-6">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Search policies..." 
+              <Input
+                placeholder="Search policies..."
+                aria-label="Search policies"
                 className="pl-9 max-w-md"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
@@ -155,14 +167,16 @@ export default function PoliciesPage() {
                         <p className="text-muted-foreground mt-1">{policy.rule}</p>
                       </div>
                       
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => setEditingPolicy(policy)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="text-destructive" onClick={() => setPolicyToDelete(policy.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      {canManagePolicies && (
+                        <div className="flex gap-2">
+                          <Button variant="ghost" size="icon" onClick={() => setEditingPolicy(policy)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => setPolicyToDelete(policy.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm bg-muted/50 p-3 rounded-md">

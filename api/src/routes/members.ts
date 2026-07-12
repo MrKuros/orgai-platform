@@ -123,22 +123,30 @@ membersRouter.post('/:orgId/members/invite', requireAuth, requireOrgRole('ORG_AD
   const memberCount = await prisma.membership.count({ where: { orgId: req.org!.id } });
   assertWithinLimit(memberCount, limitsFor(req.org!.plan).members, 'Team member', req.org!.plan);
 
-  let user = await prisma.user.findUnique({ where: { email } });
-  if (!user) {
-    user = await prisma.user.create({
-      data: { email }
+  if (assignedRoleId) {
+    const role = await prisma.role.findFirst({
+      where: { id: assignedRoleId, orgId: req.org!.id }
     });
+    if (!role) throw new AppError(400, 'ERROR', 'assignedRoleId does not belong to this organization');
   }
 
+  const existing = await prisma.user.findUnique({ where: { email } });
+
   try {
-    const membership = await prisma.membership.create({
-      data: {
-        orgId: req.org!.id,
-        userId: user.id,
-        role: membershipRole,
-        assignedRoleId
-      },
-      include: { user: { select: { id: true, email: true, firstName: true, lastName: true } } }
+    // Create user + membership atomically so a failed membership doesn't
+    // orphan a freshly-created user.
+    const { user, membership } = await prisma.$transaction(async (tx) => {
+      const user = existing ?? await tx.user.create({ data: { email } });
+      const membership = await tx.membership.create({
+        data: {
+          orgId: req.org!.id,
+          userId: user.id,
+          role: membershipRole,
+          assignedRoleId
+        },
+        include: { user: { select: { id: true, email: true, firstName: true, lastName: true } } }
+      });
+      return { user, membership };
     });
 
     await writeAuditLog({
@@ -210,10 +218,41 @@ const updateMemberSchema = z.object({
  */
 membersRouter.patch('/:orgId/members/:userId', requireAuth, requireOrgRole('ORG_ADMIN'), validate(updateMemberSchema), async (req, res) => {
   const { userId } = req.params;
+  const { membershipRole, assignedRoleId } = req.body as {
+    membershipRole?: 'ORG_ADMIN' | 'POLICY_ADMIN' | 'MEMBER';
+    assignedRoleId?: string | null;
+  };
+
+  // Block demoting the last ORG_ADMIN out of the admin role.
+  if (membershipRole !== undefined && membershipRole !== 'ORG_ADMIN') {
+    const current = await prisma.membership.findUnique({
+      where: { orgId_userId: { orgId: req.org!.id, userId } }
+    });
+    if (current?.role === 'ORG_ADMIN') {
+      const adminCount = await prisma.membership.count({
+        where: { orgId: req.org!.id, role: 'ORG_ADMIN' }
+      });
+      if (adminCount <= 1) {
+        throw new AppError(409, 'ERROR', 'Cannot demote the last ORG_ADMIN');
+      }
+    }
+  }
+
+  // Verify assignedRoleId belongs to this org before assigning.
+  if (assignedRoleId) {
+    const role = await prisma.role.findFirst({
+      where: { id: assignedRoleId, orgId: req.org!.id }
+    });
+    if (!role) throw new AppError(400, 'ERROR', 'assignedRoleId does not belong to this organization');
+  }
+
+  const data: { role?: 'ORG_ADMIN' | 'POLICY_ADMIN' | 'MEMBER'; assignedRoleId?: string | null } = {};
+  if (membershipRole !== undefined) data.role = membershipRole;
+  if (assignedRoleId !== undefined) data.assignedRoleId = assignedRoleId;
 
   const membership = await prisma.membership.update({
     where: { orgId_userId: { orgId: req.org!.id, userId } },
-    data: req.body
+    data
   });
 
   await writeAuditLog({

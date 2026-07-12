@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { validate } from '../middleware/validate';
 import { prisma } from '../lib/prisma';
-import { requireAuth, requireOrgRole } from '../middleware/auth';
+import { requireAuth, requireOrgRole, requireOrgAccess } from '../middleware/auth';
 import { authOrApiKey } from '../middleware/authOrApiKey';
 import { writeAuditLog } from '../services/audit';
 import { invalidateResolveCache } from './resolve';
@@ -39,9 +39,9 @@ export const rolesRouter = Router();
  *                   items:
  *                     $ref: '#/components/schemas/Role'
  */
-rolesRouter.get('/:orgId/roles', authOrApiKey, async (req, res) => {
+rolesRouter.get('/:orgId/roles', authOrApiKey, requireOrgAccess, async (req, res) => {
   const roles = await prisma.role.findMany({
-    where: { orgId: req.params.orgId },
+    where: { orgId: req.org!.id },
     include: {
       bindings: { include: { policy: true } },
       memberships: true

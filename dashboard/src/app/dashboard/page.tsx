@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 import { useState } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
-import { Shield, GitBranch, Users, AlertTriangle, ArrowRight, ShieldAlert, Plus, Activity, Sparkles, Zap, Clock, Download } from 'lucide-react';
+import { Shield, GitBranch, Users, ShieldAlert, Plus, Activity, Sparkles, Zap, Clock, Download } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { fetcher, seedDefaults, exportAuditCsv, ApiError } from '@/lib/api';
 import type { OrgStats } from '@/lib/types';
@@ -66,14 +66,6 @@ export default function DashboardPage() {
     }
   };
   
-  // Get recent violations (last 7 days)
-  const lastWeek = new Date();
-  lastWeek.setDate(lastWeek.getDate() - 7);
-  const { data: auditData } = useSWR<any>(
-    currentOrg ? `/orgs/${currentOrg.id}/audit?action=policy.violated&from=${lastWeek.toISOString()}` : null,
-    fetcher
-  );
-
   // Get general recent activity
   const { data: recentActivity } = useSWR<any>(
     currentOrg ? `/orgs/${currentOrg.id}/audit?limit=5` : null,
@@ -83,7 +75,6 @@ export default function DashboardPage() {
   const policyCount = policiesData?.policies?.length;
   const roleCount = rolesData?.roles?.length;
   const memberCount = membersData?.members?.length;
-  const violationCount = auditData?.data?.length || 0;
   const violations14d = stats?.violationsByDay?.reduce((sum, d) => sum + d.count, 0);
   const maxDayCount = stats?.violationsByDay?.length ? Math.max(1, ...stats.violationsByDay.map(d => d.count)) : 1;
 
@@ -114,7 +105,7 @@ export default function DashboardPage() {
             </Card>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">Active Policies</CardTitle>
@@ -140,18 +131,6 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{memberCount !== undefined ? memberCount : <Spinner className="w-6 h-6" />}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Recent Violations</CardTitle>
-                <AlertTriangle className={violationCount > 0 ? "h-4 w-4 text-destructive" : "h-4 w-4 text-muted-foreground"} />
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold ${violationCount > 0 ? 'text-destructive' : ''}`}>
-                  {violationCount !== undefined ? violationCount : <Spinner className="w-6 h-6" />}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">Last 7 days</p>
               </CardContent>
             </Card>
           </div>
@@ -253,7 +232,7 @@ export default function DashboardPage() {
             </Card>
           </div>
 
-          {(policyCount === 0 || roleCount === 0 || memberCount === 0) && (
+          {(policyCount === 0 || roleCount === 0 || memberCount === 1) && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {roleCount === 0 && (
                 <Card className="bg-primary/5 border-primary/20">

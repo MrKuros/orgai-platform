@@ -28,6 +28,39 @@ function noPoliciesError() {
   };
 }
 
+// Fail closed on any error (API unreachable, unknown role, timeout): the agent
+// must NOT treat a failed check as a pass.
+function failClosedError(err: any) {
+  return {
+    content: [{
+      type: "text" as const,
+      text: `Compliance check could not complete (${err?.message || err}). Failing closed: do not proceed with this change — report this problem to the user.`
+    }],
+    isError: true
+  };
+}
+
+const isBlocker = (v: any) => v.severity === 'error' || v.severity === 'ERROR';
+const isWarning = (v: any) => v.severity === 'warning' || v.severity === 'WARNING';
+
+// Build a check_compliance/check_command response. Emits violations ONCE plus
+// blockerCount/warningCount rather than re-serializing blocker/warning subsets
+// (that tripled the token cost). `passed` defaults to "no blockers".
+function checkResult(violations: any[], autoFix: boolean, passedOverride?: boolean) {
+  const blockerCount = violations.filter(isBlocker).length;
+  const warningCount = violations.filter(isWarning).length;
+  const passed = passedOverride ?? blockerCount === 0;
+  const summary = violations.length > 0
+    ? `${blockerCount} errors, ${warningCount} warning found`
+    : "All checks passed";
+  return {
+    content: [{
+      type: "text" as const,
+      text: JSON.stringify({ passed, violations, blockerCount, warningCount, summary, guidance: guidance(blockerCount, warningCount, autoFix) }, null, 2)
+    }]
+  };
+}
+
 function resolveParams(input: { policyUrl?: string; userRole?: string; authHeader?: string }) {
   return {
     policyUrl: input.policyUrl || process.env.COMPLY_POLICY_URL || undefined,
@@ -90,55 +123,29 @@ export function registerTools(server: McpServer) {
     checkComplianceSchema.shape as any,
     async (params: any) => {
       const { policyUrl, userRole, authHeader, bundledPolicyPath } = resolveParams(params);
-      
-      if (isApiMode && client) {
-        const orgInfo = await client.getOrgFromApiKey();
-        const res = await client.check(orgInfo.orgId, {
-          type: 'code',
-          content: params.code,
-          filePath: params.filePath,
-          roleName: userRole
-        });
-        
-        const blockers = res.violations.filter((v: any) => v.severity === 'ERROR' || v.severity === 'error');
-        const warnings = res.violations.filter((v: any) => v.severity === 'WARNING' || v.severity === 'warning');
-        
-        let summary = "All checks passed";
-        if (res.violations.length > 0) {
-          summary = `${blockers.length} errors, ${warnings.length} warning found`;
+      try {
+        if (isApiMode && client) {
+          const orgInfo = await client.getOrgFromApiKey();
+          const res = await client.check(orgInfo.orgId, {
+            type: 'code',
+            content: params.code,
+            filePath: params.filePath,
+            roleName: userRole
+          });
+          return checkResult(res.violations, effectiveAutoFix(orgInfo.autoFix), res.passed);
         }
-        
-        return {
-          content: [{
-            type: "text" as const,
-            text: JSON.stringify({ passed: res.passed, violations: res.violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length, effectiveAutoFix(orgInfo.autoFix)) }, null, 2)
-          }]
-        };
-      }
-      
-      const engine = new PolicyEngine({ policyUrl, authHeader, bundledPolicyPath });
-      await engine.load();
-      if (!engine.isLoaded()) return noPoliciesError();
-      engine.resolve(userRole);
-      
-      const evaluator = new Evaluator(engine.getResolvedPolicies());
-      const violations = evaluator.evaluateCode(params.code, params.filePath);
-      
-      const blockers = violations.filter(v => (v.severity as string) === 'error' || (v.severity as string) === 'ERROR');
-      const warnings = violations.filter(v => (v.severity as string) === 'warning' || (v.severity as string) === 'WARNING');
-      const passed = blockers.length === 0;
-      
-      let summary = "All checks passed";
-      if (violations.length > 0) {
-        summary = `${blockers.length} errors, ${warnings.length} warning found`;
-      }
 
-      return {
-        content: [{
-          type: "text" as const,
-          text: JSON.stringify({ passed, violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length, effectiveAutoFix()) }, null, 2)
-        }]
-      };
+        const engine = new PolicyEngine({ policyUrl, authHeader, bundledPolicyPath });
+        await engine.load();
+        if (!engine.isLoaded()) return noPoliciesError();
+        engine.resolve(userRole);
+
+        const evaluator = new Evaluator(engine.getResolvedPolicies());
+        const violations = evaluator.evaluateCode(params.code, params.filePath);
+        return checkResult(violations, effectiveAutoFix());
+      } catch (err: any) {
+        return failClosedError(err);
+      }
     }
   );
 
@@ -155,54 +162,28 @@ export function registerTools(server: McpServer) {
     checkCommandSchema.shape as any,
     async (params: any) => {
       const { policyUrl, userRole, authHeader, bundledPolicyPath } = resolveParams(params);
-      
-      if (isApiMode && client) {
-        const orgInfo = await client.getOrgFromApiKey();
-        const res = await client.check(orgInfo.orgId, {
-          type: 'command',
-          content: params.command,
-          roleName: userRole
-        });
-        
-        const blockers = res.violations.filter((v: any) => v.severity === 'ERROR' || v.severity === 'error');
-        const warnings = res.violations.filter((v: any) => v.severity === 'WARNING' || v.severity === 'warning');
-        
-        let summary = "All checks passed";
-        if (res.violations.length > 0) {
-          summary = `${blockers.length} errors, ${warnings.length} warning found`;
+      try {
+        if (isApiMode && client) {
+          const orgInfo = await client.getOrgFromApiKey();
+          const res = await client.check(orgInfo.orgId, {
+            type: 'command',
+            content: params.command,
+            roleName: userRole
+          });
+          return checkResult(res.violations, effectiveAutoFix(orgInfo.autoFix), res.passed);
         }
-        
-        return {
-          content: [{
-            type: "text" as const,
-            text: JSON.stringify({ passed: res.passed, violations: res.violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length, effectiveAutoFix(orgInfo.autoFix)) }, null, 2)
-          }]
-        };
-      }
-      
-      const engine = new PolicyEngine({ policyUrl, authHeader, bundledPolicyPath });
-      await engine.load();
-      if (!engine.isLoaded()) return noPoliciesError();
-      engine.resolve(userRole);
-      
-      const evaluator = new Evaluator(engine.getResolvedPolicies());
-      const violations = evaluator.evaluateCommand(params.command);
-      
-      const blockers = violations.filter(v => (v.severity as string) === 'error' || (v.severity as string) === 'ERROR');
-      const warnings = violations.filter(v => (v.severity as string) === 'warning' || (v.severity as string) === 'WARNING');
-      const passed = blockers.length === 0;
-      
-      let summary = "All checks passed";
-      if (violations.length > 0) {
-        summary = `${blockers.length} errors, ${warnings.length} warning found`;
-      }
 
-      return {
-        content: [{
-          type: "text" as const,
-          text: JSON.stringify({ passed, violations, blockers, warnings, summary, guidance: guidance(blockers.length, warnings.length, effectiveAutoFix()) }, null, 2)
-        }]
-      };
+        const engine = new PolicyEngine({ policyUrl, authHeader, bundledPolicyPath });
+        await engine.load();
+        if (!engine.isLoaded()) return noPoliciesError();
+        engine.resolve(userRole);
+
+        const evaluator = new Evaluator(engine.getResolvedPolicies());
+        const violations = evaluator.evaluateCommand(params.command);
+        return checkResult(violations, effectiveAutoFix());
+      } catch (err: any) {
+        return failClosedError(err);
+      }
     }
   );
 
@@ -230,37 +211,41 @@ export function registerTools(server: McpServer) {
         setBy: p.setByDisplayName || undefined,
       });
 
-      if (isApiMode && client) {
-        const orgInfo = await client.getOrgFromApiKey();
-        const res = await client.resolveRole(orgInfo.orgId, userRole);
+      try {
+        if (isApiMode && client) {
+          const orgInfo = await client.getOrgFromApiKey();
+          const res = await client.resolveRole(orgInfo.orgId, userRole);
+          return {
+            content: [{
+              type: "text" as const,
+              text: JSON.stringify({
+                role: res.role.name,
+                displayName: res.role.displayName,
+                policies: (res.policies || []).map(slim),
+                resolvedFrom: res.resolvedFrom
+              }, null, 2)
+            }]
+          };
+        }
+
+        const engine = new PolicyEngine({ policyUrl, authHeader, bundledPolicyPath });
+        await engine.load();
+        if (!engine.isLoaded()) return noPoliciesError();
+        engine.resolve(userRole);
+
+        const role = userRole;
+        const displayName = engine.getCurrentRoleDisplay();
+        const policies = engine.getResolvedPolicies().map(slim);
+
         return {
           content: [{
             type: "text" as const,
-            text: JSON.stringify({
-              role: res.role.name,
-              displayName: res.role.displayName,
-              policies: (res.policies || []).map(slim),
-              resolvedFrom: res.resolvedFrom
-            }, null, 2)
+            text: JSON.stringify({ role, displayName, policies }, null, 2)
           }]
         };
+      } catch (err: any) {
+        return failClosedError(err);
       }
-
-      const engine = new PolicyEngine({ policyUrl, authHeader, bundledPolicyPath });
-      await engine.load();
-      if (!engine.isLoaded()) return noPoliciesError();
-      engine.resolve(userRole);
-
-      const role = userRole;
-      const displayName = engine.getCurrentRoleDisplay();
-      const policies = engine.getResolvedPolicies().map(slim);
-
-      return {
-        content: [{
-          type: "text" as const,
-          text: JSON.stringify({ role, displayName, policies }, null, 2)
-        }]
-      };
     }
   );
 
@@ -277,7 +262,7 @@ export function registerTools(server: McpServer) {
     scanDiffSchema.shape as any,
     async (params: any) => {
       const { policyUrl, userRole, authHeader, bundledPolicyPath } = resolveParams(params);
-      
+      try {
       let orgId: string | null = null;
       let orgAutoFix: boolean | undefined;
       let evaluator: Evaluator | null = null;
@@ -293,7 +278,7 @@ export function registerTools(server: McpServer) {
         engine.resolve(userRole);
         evaluator = new Evaluator(engine.getResolvedPolicies());
       }
-      
+
       const files: { path: string, violations: any[] }[] = [];
       const commands: { command: string, violations: any[] }[] = [];
       let totalBlockers = 0;
@@ -360,6 +345,9 @@ export function registerTools(server: McpServer) {
           text: JSON.stringify({ files, commands, totalBlockers, totalWarnings, passed, guidance: guidance(totalBlockers, totalWarnings, effectiveAutoFix(orgAutoFix)) }, null, 2)
         }]
       };
+      } catch (err: any) {
+        return failClosedError(err);
+      }
     }
   );
 
@@ -375,15 +363,18 @@ export function registerTools(server: McpServer) {
         };
       }
       
-      const orgInfo = await client.getOrgFromApiKey();
-      const res = await client.listRoles(orgInfo.orgId);
-      
-      return {
-        content: [{
-          type: "text" as const,
-          text: JSON.stringify(res, null, 2)
-        }]
-      };
+      try {
+        const orgInfo = await client.getOrgFromApiKey();
+        const res = await client.listRoles(orgInfo.orgId);
+        return {
+          content: [{
+            type: "text" as const,
+            text: JSON.stringify(res, null, 2)
+          }]
+        };
+      } catch (err: any) {
+        return failClosedError(err);
+      }
     }
   );
 

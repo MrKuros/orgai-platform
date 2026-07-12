@@ -6,10 +6,13 @@ import useSWR from 'swr';
 import ReactFlow, { Background, Controls, Node, Edge, MarkerType } from 'reactflow';
 import dagre from 'dagre';
 import 'reactflow/dist/style.css';
-import { Plus, X, GitBranch } from 'lucide-react';
+import { Plus, X, GitBranch, AlertTriangle } from 'lucide-react';
 
-import { useAuth } from '@/lib/auth';
-import { fetcher, createRole, updateRole, deleteRole, updatePolicy, ApiError } from '@/lib/api';
+import { useAuth, useRole } from '@/lib/auth';
+import { fetcher, createRole, updateRole, deleteRole, ApiError } from '@/lib/api';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { AppLayout } from '@/components/layout/app-layout';
 import { PageHeader } from '@/components/layout/page-header';
@@ -19,6 +22,7 @@ import { CreateRoleDialog } from '@/components/create-role-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const nodeTypes = { customRole: RoleNode };
 
@@ -53,13 +57,20 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
 
 export default function RolesPage() {
   const { currentOrg } = useAuth();
+  const { canManagePolicies } = useRole();
   const { toast } = useToast();
-  
-  const { data, mutate, isLoading } = useSWR<any>(currentOrg ? `/orgs/${currentOrg.id}/roles` : null, fetcher);
-  
+
+  const { data, mutate, isLoading, error } = useSWR<any>(currentOrg ? `/orgs/${currentOrg.id}/roles` : null, fetcher);
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
-  
+
+  // Edit state
+  const [editingRole, setEditingRole] = useState<any | null>(null);
+  const [editDisplayName, setEditDisplayName] = useState('');
+  const [editInheritsFromId, setEditInheritsFromId] = useState<string>('none');
+  const [isSaving, setIsSaving] = useState(false);
+
   // Delete confirm state
   const [roleToDelete, setRoleToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -119,6 +130,31 @@ export default function RolesPage() {
     }
   };
 
+  const openEdit = (role: any) => {
+    setEditingRole(role);
+    setEditDisplayName(role.displayName);
+    setEditInheritsFromId(role.inheritsFromId || 'none');
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentOrg || !editingRole || !editDisplayName.trim()) return;
+    setIsSaving(true);
+    try {
+      await updateRole(currentOrg.id, editingRole.id, {
+        displayName: editDisplayName.trim(),
+        inheritsFromId: editInheritsFromId === 'none' ? null : editInheritsFromId,
+      });
+      setEditingRole(null);
+      mutate();
+      toast({ title: 'Role updated' });
+    } catch (error) {
+      toast({ title: 'Error updating role', description: error instanceof ApiError ? error.message : 'Unknown error', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleDeleteConfirm = async () => {
     if (!currentOrg || !roleToDelete) return;
     setIsDeleting(true);
@@ -139,14 +175,23 @@ export default function RolesPage() {
     <AppLayout>
       <div className="flex flex-col h-full overflow-hidden">
         <div className="px-6 pt-6 shrink-0">
-          <PageHeader 
-            title="Roles" 
+          <PageHeader
+            title="Roles"
             description="Manage your compliance hierarchy and policy inheritance."
-            action={<Button onClick={() => setIsCreateOpen(true)}><Plus className="w-4 h-4 mr-2" /> New Role</Button>}
+            action={canManagePolicies ? <Button onClick={() => setIsCreateOpen(true)}><Plus className="w-4 h-4 mr-2" /> New Role</Button> : undefined}
           />
         </div>
 
-        {isLoading ? (
+        {error ? (
+          <div className="px-6 pb-6">
+            <EmptyState
+              icon={<AlertTriangle className="w-10 h-10 text-destructive" />}
+              title="Couldn't load roles"
+              description="Something went wrong fetching your roles. Check your connection and try again."
+              action={<Button onClick={() => mutate()}>Retry</Button>}
+            />
+          </div>
+        ) : isLoading ? (
           <div className="flex-1 flex items-center justify-center"><Spinner className="w-8 h-8" /></div>
         ) : roles.length === 0 ? (
           <div className="px-6 pb-6">
@@ -154,7 +199,7 @@ export default function RolesPage() {
               icon={<GitBranch className="w-10 h-10 text-muted-foreground" />}
               title="No roles yet"
               description="Create your first role to start building your compliance hierarchy."
-              action={<Button onClick={() => setIsCreateOpen(true)}><Plus className="w-4 h-4 mr-2" /> Create Role</Button>}
+              action={canManagePolicies ? <Button onClick={() => setIsCreateOpen(true)}><Plus className="w-4 h-4 mr-2" /> Create Role</Button> : undefined}
             />
           </div>
         ) : (
@@ -213,11 +258,16 @@ export default function RolesPage() {
                     </div>
                   </div>
 
-                  <div className="p-4 border-t bg-muted/20">
-                    <Button variant="destructive" className="w-full" onClick={() => setRoleToDelete(selectedRole.id)}>
-                      Delete Role
-                    </Button>
-                  </div>
+                  {canManagePolicies && (
+                    <div className="p-4 border-t bg-muted/20 space-y-2">
+                      <Button variant="outline" className="w-full" onClick={() => openEdit(selectedRole)}>
+                        Edit Role
+                      </Button>
+                      <Button variant="destructive" className="w-full" onClick={() => setRoleToDelete(selectedRole.id)}>
+                        Delete Role
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -225,12 +275,50 @@ export default function RolesPage() {
         )}
       </div>
 
-      <CreateRoleDialog 
-        open={isCreateOpen} 
-        onOpenChange={setIsCreateOpen} 
-        existingRoles={roles} 
-        onSubmit={handleCreateRole} 
+      <CreateRoleDialog
+        open={isCreateOpen}
+        onOpenChange={setIsCreateOpen}
+        existingRoles={roles}
+        onSubmit={handleCreateRole}
       />
+
+      {/* Edit Role Dialog */}
+      <Dialog open={!!editingRole} onOpenChange={(open) => !open && setEditingRole(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Role</DialogTitle>
+            <DialogDescription>
+              Rename {editingRole?.name} or change what it inherits from.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSaveEdit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="editDisplayName">Display Name</Label>
+              <Input id="editDisplayName" value={editDisplayName} onChange={(e) => setEditDisplayName(e.target.value)} disabled={isSaving} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editInheritsFrom">Inherits From</Label>
+              <Select value={editInheritsFromId} onValueChange={setEditInheritsFromId} disabled={isSaving}>
+                <SelectTrigger id="editInheritsFrom">
+                  <SelectValue placeholder="Select parent role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None (Root Role)</SelectItem>
+                  {roles.filter((r: any) => r.id !== editingRole?.id).map((r: any) => (
+                    <SelectItem key={r.id} value={r.id}>{r.displayName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditingRole(null)} disabled={isSaving}>Cancel</Button>
+              <Button type="submit" disabled={isSaving || !editDisplayName.trim()}>
+                {isSaving && <Spinner className="mr-2" />} Save Changes
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={!!roleToDelete}
