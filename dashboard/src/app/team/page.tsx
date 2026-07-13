@@ -21,6 +21,32 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
+// Checkbox list of org roles — a member can hold several (multiple superiors).
+// Hoisted above the page component so toggles don't remount the list
+// (which loses scroll position and focus inside the scroll area).
+function RolePicker({ roles, selected, onToggle, disabled, idPrefix }: {
+  roles: any[]; selected: string[]; onToggle: (id: string) => void; disabled: boolean; idPrefix: string;
+}) {
+  return (
+    <div className="border rounded-md divide-y max-h-44 overflow-y-auto">
+      {roles.length === 0 && <p className="text-xs text-muted-foreground p-3">No org roles defined yet.</p>}
+      {roles.map((r: any) => (
+        <label key={r.id} htmlFor={`${idPrefix}-${r.id}`} className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-muted/50">
+          <input
+            id={`${idPrefix}-${r.id}`}
+            type="checkbox"
+            className="h-4 w-4 accent-primary"
+            checked={selected.includes(r.id)}
+            onChange={() => onToggle(r.id)}
+            disabled={disabled}
+          />
+          {r.displayName}
+        </label>
+      ))}
+    </div>
+  );
+}
+
 export default function TeamPage() {
   const { currentOrg, user: currentUser } = useAuth();
   const { canManageOrg } = useRole();
@@ -51,28 +77,6 @@ export default function TeamPage() {
 
   const toggleId = (ids: string[], id: string) =>
     ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id];
-
-  // Checkbox list of org roles — a member can hold several (multiple superiors).
-  const RolePicker = ({ selected, onToggle, disabled, idPrefix }: {
-    selected: string[]; onToggle: (id: string) => void; disabled: boolean; idPrefix: string;
-  }) => (
-    <div className="border rounded-md divide-y max-h-44 overflow-y-auto">
-      {roles.length === 0 && <p className="text-xs text-muted-foreground p-3">No org roles defined yet.</p>}
-      {roles.map((r: any) => (
-        <label key={r.id} htmlFor={`${idPrefix}-${r.id}`} className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-muted/50">
-          <input
-            id={`${idPrefix}-${r.id}`}
-            type="checkbox"
-            className="h-4 w-4 accent-primary"
-            checked={selected.includes(r.id)}
-            onChange={() => onToggle(r.id)}
-            disabled={disabled}
-          />
-          {r.displayName}
-        </label>
-      ))}
-    </div>
-  );
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -296,6 +300,7 @@ export default function TeamPage() {
             <div className="space-y-2">
               <Label>Organization Roles (for Policies)</Label>
               <RolePicker
+                roles={roles}
                 selected={inviteAssignedRoleIds}
                 onToggle={(id) => setInviteAssignedRoleIds(ids => toggleId(ids, id))}
                 disabled={isInviting}
@@ -339,6 +344,7 @@ export default function TeamPage() {
             <div className="space-y-2">
               <Label>Organization Roles (for Policies)</Label>
               <RolePicker
+                roles={roles}
                 selected={newAssignedRoleIds}
                 onToggle={(id) => setNewAssignedRoleIds(ids => toggleId(ids, id))}
                 disabled={isChanging}

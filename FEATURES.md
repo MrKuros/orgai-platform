@@ -57,7 +57,7 @@ enforced across every agent your team runs — with the audit trail to prove it.
 ## Audit & evidence
 
 - **Append-only audit trail** — every check — blocked or allowed — is logged
-  (`policy.checked`), plus every violation, login, invite, key event, and
+  (`policy.checked`), plus every violation, invite, key event, and
   webhook change, with actor, org, action, resource, timestamp.
 - **CSV export** (most recent 5,000 rows) — audit-ready evidence for SOC 2,
   ISO 27001, HIPAA, and India DPDP reviews. (Evidence, not certification — the

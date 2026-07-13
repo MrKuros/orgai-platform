@@ -6,6 +6,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { OrgAIClient } from "./api-client";
 import { requireApiKey } from "../middleware/auth";
+import { logger } from "../lib/logger";
 
 type SseEntry = { transport: SSEServerTransport; server: ReturnType<typeof createServer>; lastSeen: number };
 type HttpEntry = { transport: StreamableHTTPServerTransport; server: ReturnType<typeof createServer>; lastSeen: number };
@@ -65,6 +66,17 @@ let lazyOrgAt = 0;
 const LAZY_TTL_MS = 60_000; // retry after a transient failure / refresh cache
 
 export function mountMcpRoutes(app: Application): void {
+  // Standalone mode (no COMPLY_API_KEY) leaves /mcp unauthenticated with
+  // bundled baseline policies only. Fine on a laptop; loud warning in prod
+  // so a misconfigured self-host deploy can't silently run open.
+  if (!process.env.COMPLY_API_KEY && process.env.NODE_ENV === 'production') {
+    logger.warn(
+      'MCP running in STANDALONE mode: COMPLY_API_KEY is not set. /mcp endpoints are ' +
+      'unauthenticated and enforce only the bundled baseline policies — org policies ' +
+      'and audit logging are OFF. Set COMPLY_API_KEY to enable API mode.'
+    );
+  }
+
   app.get('/mcp/health', async (req: Request, res: Response) => {
     const isApiMode = !!process.env.COMPLY_API_KEY;
     if (!isApiMode) {

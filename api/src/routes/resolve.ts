@@ -286,7 +286,8 @@ resolveRouter.post('/:orgId/check', requireApiKey, validate(checkSchema), async 
     let line: number | undefined;
 
     if (type === 'code' && policy.evaluatorType === 'regex') {
-      if (policy.name === 'no-console-log' && filePath?.includes('logger')) continue;
+      // Exempt actual logger modules only — not any path containing "logger".
+      if (policy.name === 'no-console-log' && filePath && /(^|\/)logg?er\.[jt]sx?$/i.test(filePath)) continue;
 
       const regex = new RegExp(policy.evaluatorPattern, policy.evaluatorFlags || '');
       const match = regex.exec(content);
