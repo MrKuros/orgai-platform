@@ -26,7 +26,72 @@ export function invalidateResolveCache(orgId?: string) {
   }
 }
 
+// Resolve one or more roles. `roleName` may be comma-separated
+// ("payments-dev,security-champion") for members under multiple superiors —
+// the result is the UNION of each role's inheritance chain. Name conflicts
+// across branches resolve strictest-wins (ERROR beats WARNING): fail-closed.
 export async function resolveRolePolicies(orgId: string, roleName: string) {
+  const names = roleName.split(',').map(n => n.trim()).filter(Boolean);
+  if (names.length === 0) return null;
+  if (names.length === 1) return resolveSingleRole(orgId, names[0]);
+
+  const cacheKey = `${orgId}:${names.join(',')}`;
+  const cached = cache.get(cacheKey);
+  if (cached && cached.expires > Date.now()) {
+    return cached.data;
+  }
+
+  const results = [];
+  for (const name of names) {
+    const r = await resolveSingleRole(orgId, name);
+    if (!r) return null; // any unknown role → fail-closed, same as a single unknown role
+    results.push(r);
+  }
+
+  const policyMap = new Map<string, any>();
+  const resolvedFrom: string[] = [];
+  const warnings: { policyName: string; overriddenByRole: string; originalRole: string }[] = [];
+
+  for (const r of results) {
+    for (const from of r.resolvedFrom) {
+      if (!resolvedFrom.includes(from)) resolvedFrom.push(from);
+    }
+    warnings.push(...r.warnings);
+    for (const policy of r.policies) {
+      const existing = policyMap.get(policy.name);
+      if (!existing) {
+        policyMap.set(policy.name, policy);
+        continue;
+      }
+      if (existing.id === policy.id) continue; // same policy via two branches — no conflict
+      // Cross-branch name conflict: strictest severity wins.
+      const winner = existing.severity === 'ERROR' ? existing : policy.severity === 'ERROR' ? policy : existing;
+      const loser = winner === existing ? policy : existing;
+      policyMap.set(policy.name, winner);
+      warnings.push({
+        policyName: policy.name,
+        overriddenByRole: winner.setByRole,
+        originalRole: loser.setByRole
+      });
+    }
+  }
+
+  const responseData = {
+    role: {
+      id: results.map(r => r.role.id).join(','),
+      name: names.join(','),
+      displayName: results.map(r => r.role.displayName).join(' + ')
+    },
+    resolvedFrom,
+    policies: Array.from(policyMap.values()),
+    warnings
+  };
+
+  cache.set(cacheKey, { data: responseData, expires: Date.now() + 5 * 60 * 1000 });
+  return responseData;
+}
+
+async function resolveSingleRole(orgId: string, roleName: string) {
   const cacheKey = `${orgId}:${roleName}`;
 
   const cached = cache.get(cacheKey);
@@ -98,7 +163,7 @@ export async function resolveRolePolicies(orgId: string, roleName: string) {
  * @swagger
  * /v1/orgs/{orgId}/resolve/{roleName}:
  *   get:
- *     summary: Resolve policies for a role
+ *     summary: Resolve policies for a role (comma-separate for multiple roles — returns the union, strictest-wins on conflicts)
  *     tags: [Resolve]
  *     security:
  *       - bearerAuth: []

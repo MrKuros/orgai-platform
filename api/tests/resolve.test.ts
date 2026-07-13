@@ -136,4 +136,84 @@ describe('Resolve & Check Routes', () => {
     expect(res.body.policies[0].rule).toBe('No secrets'); // CTO's rule
     expect(res.body.policies[0].setByRole).toBe('cto');
   });
+
+  describe('multi-role resolution (comma-separated)', () => {
+    beforeAll(async () => {
+      // Two department branches under CTO, each with its own policy
+      const payRes = await request(app)
+        .post(`/v1/orgs/${orgId}/roles`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'payments-dev', displayName: 'Payments Dev', inheritsFromId: ctoRoleId });
+      const mlRes = await request(app)
+        .post(`/v1/orgs/${orgId}/roles`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'ml-dev', displayName: 'ML Dev', inheritsFromId: ctoRoleId });
+
+      await request(app)
+        .post(`/v1/orgs/${orgId}/policies`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'no-card-numbers',
+          rule: 'No raw card numbers',
+          evaluatorType: 'regex',
+          evaluatorPattern: 'cardNumber\\s*=',
+          severity: 'ERROR',
+          roleIds: [payRes.body.role.id]
+        });
+      await request(app)
+        .post(`/v1/orgs/${orgId}/policies`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'no-training-data-paths',
+          rule: 'No hardcoded training data paths',
+          evaluatorType: 'regex',
+          evaluatorPattern: 'trainingData\\s*=',
+          severity: 'ERROR',
+          roleIds: [mlRes.body.role.id]
+        });
+    });
+
+    it('resolve of two roles returns the union of both chains', async () => {
+      const res = await request(app)
+        .get(`/v1/orgs/${orgId}/resolve/payments-dev,ml-dev`)
+        .set('x-api-key', apiKey);
+      expect(res.status).toBe(200);
+      const names = res.body.policies.map((p: any) => p.name).sort();
+      // union: cto's no-secret + both department policies
+      expect(names).toEqual(['no-card-numbers', 'no-secret', 'no-training-data-paths']);
+      expect(res.body.resolvedFrom).toEqual(expect.arrayContaining(['cto', 'payments-dev', 'ml-dev']));
+      // cto appears once despite being in both chains
+      expect(res.body.resolvedFrom.filter((n: string) => n === 'cto').length).toBe(1);
+    });
+
+    it('check as both roles enforces policies from each branch', async () => {
+      const pay = await request(app)
+        .post(`/v1/orgs/${orgId}/check`)
+        .set('x-api-key', apiKey)
+        .send({ type: 'code', content: 'const cardNumber = "4111"', roleName: 'payments-dev,ml-dev' });
+      expect(pay.status).toBe(200);
+      expect(pay.body.passed).toBe(false);
+
+      const ml = await request(app)
+        .post(`/v1/orgs/${orgId}/check`)
+        .set('x-api-key', apiKey)
+        .send({ type: 'code', content: 'const trainingData = "/mnt/x"', roleName: 'payments-dev,ml-dev' });
+      expect(ml.status).toBe(200);
+      expect(ml.body.passed).toBe(false);
+
+      const clean = await request(app)
+        .post(`/v1/orgs/${orgId}/check`)
+        .set('x-api-key', apiKey)
+        .send({ type: 'code', content: 'const a = 1;', roleName: 'payments-dev,ml-dev' });
+      expect(clean.status).toBe(200);
+      expect(clean.body.passed).toBe(true);
+    });
+
+    it('any unknown role in the list fails closed (404)', async () => {
+      const res = await request(app)
+        .get(`/v1/orgs/${orgId}/resolve/payments-dev,ghost-role`)
+        .set('x-api-key', apiKey);
+      expect(res.status).toBe(404);
+    });
+  });
 });

@@ -112,7 +112,7 @@ export function registerTools(server: McpServer) {
   const checkComplianceSchema = z.object({
     code: z.string().describe("The code to check"),
     filePath: z.string().describe("File path (used for context, e.g. logger exemption)"),
-    userRole: z.string().optional().describe("Role key e.g. 'junior', 'senior', 'lead', 'cto'"),
+    userRole: z.string().optional().describe("Role key e.g. 'junior', 'senior', 'lead', 'cto'. Comma-separate for multiple roles ('payments-dev,ml-dev') — policies from every role's chain apply"),
     policyUrl: z.string().optional().describe("Remote URL to fetch policies.json from"),
     authHeader: z.string().optional().describe("Optional Authorization header for private policy URLs"),
   });
