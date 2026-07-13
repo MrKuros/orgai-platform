@@ -15,8 +15,11 @@ In two teams? Comma-separate the roles — policies from both apply:
 `--role "payments-dev,ml-dev"`
 
 That's it — it auto-configures every AI agent it detects on your machine
-(Claude Code, Cursor, Windsurf, OpenCode, Antigravity) *and* installs the git
-pre-commit hook with your role. Restart your IDE. Done.
+(Claude Code, Cursor, Windsurf, OpenCode, Antigravity, and VS Code / Copilot
+agent mode via `.vscode/mcp.json`) *and* installs the git pre-commit hook with
+your role, reporting only the agents it actually configured. Restart your IDE.
+Done. Note: the one-liner stores your API key in `.git/config` — treat the repo
+directory accordingly.
 
 Everything below is the manual fallback / reference.
 
@@ -29,16 +32,20 @@ One JSON block, same shape everywhere — replace URL and key:
   "mcpServers": {
     "orgai": {
       "url": "https://<orgai-host>/mcp",
-      "env": { "COMPLY_API_KEY": "oai_..." }
+      "headers": { "x-api-key": "oai_..." }
     }
   }
 }
 ```
 
+(The key must go in `headers` — a client-side `env` block never reaches a
+remote server.)
+
 | Agent | Where |
 |---|---|
-| Claude Code | `claude mcp add orgai https://<orgai-host>/mcp` (or `~/.claude/mcp_config.json`) |
+| Claude Code | `claude mcp add orgai --transport http https://<orgai-host>/mcp --header "x-api-key: oai_..."` |
 | Cursor | `.cursor/mcp.json` in the repo (or global Cursor settings) |
+| VS Code / GitHub Copilot (agent mode) | `.vscode/mcp.json` in the repo: `{ "servers": { "orgai": { "type": "http", "url": "https://<orgai-host>/mcp", "headers": { "x-api-key": "oai_..." } } } }` — setup.sh writes this automatically when run inside a repo |
 | Windsurf | `~/.codeium/windsurf/mcp_config.json` |
 | Other MCP agents | same JSON in that agent's MCP config |
 
@@ -63,7 +70,8 @@ git config orgai.role   <your-role>        # default: junior
 Global install for all repos: `git config core.hooksPath <dir>`.)
 
 Behavior: `ERROR` violations block the commit, `WARNING`s print and allow,
-unreachable server blocks (fail-closed). Emergency bypass — logged, use sparingly:
+unreachable server blocks (fail-closed). Emergency bypass — logged to the org
+audit trail as `hook.bypassed`, use sparingly:
 
 ```bash
 COMPLY_SKIP=1 git commit ...

@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 import { useState } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
-import { Shield, GitBranch, Users, ShieldAlert, Plus, Activity, Sparkles, Zap, Clock, Download } from 'lucide-react';
+import { Shield, GitBranch, Users, ShieldAlert, Plus, Activity, Sparkles, Zap, Clock, Download, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { fetcher, seedDefaults, exportAuditCsv, ApiError } from '@/lib/api';
 import type { OrgStats } from '@/lib/types';
@@ -29,10 +29,10 @@ export default function DashboardPage() {
   const { currentOrg } = useAuth();
   const { toast } = useToast();
 
-  const { data: policiesData, mutate: mutatePolicies } = useSWR<any>(currentOrg ? `/orgs/${currentOrg.id}/policies` : null, fetcher);
-  const { data: rolesData, mutate: mutateRoles } = useSWR<any>(currentOrg ? `/orgs/${currentOrg.id}/roles` : null, fetcher);
-  const { data: membersData } = useSWR<any>(currentOrg ? `/orgs/${currentOrg.id}/members` : null, fetcher);
-  const { data: stats } = useSWR<OrgStats>(currentOrg ? `/orgs/${currentOrg.id}/stats` : null, fetcher as any);
+  const { data: policiesData, mutate: mutatePolicies, error: policiesError } = useSWR<any>(currentOrg ? `/orgs/${currentOrg.id}/policies` : null, fetcher);
+  const { data: rolesData, mutate: mutateRoles, error: rolesError } = useSWR<any>(currentOrg ? `/orgs/${currentOrg.id}/roles` : null, fetcher);
+  const { data: membersData, mutate: mutateMembers, error: membersError } = useSWR<any>(currentOrg ? `/orgs/${currentOrg.id}/members` : null, fetcher);
+  const { data: stats, mutate: mutateStats, error: statsError } = useSWR<OrgStats>(currentOrg ? `/orgs/${currentOrg.id}/stats` : null, fetcher as any);
 
   const [isSeeding, setIsSeeding] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -67,10 +67,19 @@ export default function DashboardPage() {
   };
   
   // Get general recent activity
-  const { data: recentActivity } = useSWR<any>(
+  const { data: recentActivity, mutate: mutateActivity, error: activityError } = useSWR<any>(
     currentOrg ? `/orgs/${currentOrg.id}/audit?limit=5` : null,
     fetcher
   );
+
+  const loadError = policiesError || rolesError || membersError || statsError || activityError;
+  const handleRetry = () => {
+    mutatePolicies();
+    mutateRoles();
+    mutateMembers();
+    mutateStats();
+    mutateActivity();
+  };
 
   const policyCount = policiesData?.policies?.length;
   const roleCount = rolesData?.roles?.length;
@@ -86,6 +95,14 @@ export default function DashboardPage() {
           description="Overview of your organization's AI compliance status."
         />
 
+        {loadError ? (
+          <EmptyState
+            icon={<AlertTriangle className="w-10 h-10 text-destructive" />}
+            title="Couldn't load dashboard"
+            description="Something went wrong fetching your organization's data. Check your connection and try again."
+            action={<Button onClick={handleRetry}>Retry</Button>}
+          />
+        ) : (
         <div className="space-y-6">
           {roleCount === 0 && (
             <Card className="bg-primary/5 border-primary/20">
@@ -317,6 +334,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+        )}
       </div>
     </AppLayout>
   );

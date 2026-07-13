@@ -6,7 +6,7 @@ import useSWR from 'swr';
 import { AlertTriangle, Plus, Lightbulb, Copy } from 'lucide-react';
 
 import { useAuth } from '@/lib/auth';
-import { fetcher, createApiKey, ApiError } from '@/lib/api';
+import { fetcher, createApiKey, getApiBase, ApiError } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { AppLayout } from '@/components/layout/app-layout';
 import { PageHeader } from '@/components/layout/page-header';
@@ -15,8 +15,6 @@ import { Spinner } from '@/components/ui/spinner';
 import { CopyButton } from '@/components/copy-button';
 import { IdeSetupTabs } from '@/components/ide-setup-tabs';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.orgai.dev';
-
 export default function IdeSetupPage() {
   const { currentOrg } = useAuth();
   const { toast } = useToast();
@@ -24,27 +22,9 @@ export default function IdeSetupPage() {
   // Empty NEXT_PUBLIC_API_URL means same-origin (self-host proxy) — resolve on the client to avoid hydration mismatch.
   const [apiBase, setApiBase] = useState(process.env.NEXT_PUBLIC_API_URL || '');
   useEffect(() => {
-    if (!process.env.NEXT_PUBLIC_API_URL) setApiBase(window.location.origin);
+    setApiBase(getApiBase());
   }, []);
   const mcpUrl = `${apiBase}/mcp`;
-
-  const quickConnectBlocks: { title: string; description: string; snippet: string }[] = [
-    {
-      title: 'Claude Code',
-      description: 'Run in your terminal:',
-      snippet: `claude mcp add --transport http orgai ${mcpUrl}`,
-    },
-    {
-      title: 'Cursor',
-      description: 'Add to .cursor/mcp.json:',
-      snippet: JSON.stringify({ mcpServers: { orgai: { url: mcpUrl } } }, null, 2),
-    },
-    {
-      title: 'OpenAI Codex',
-      description: 'Add to ~/.codex/config.toml:',
-      snippet: `[mcp_servers.orgai]\nurl = "${mcpUrl}"`,
-    },
-  ];
 
   const handleCopySnippet = async (snippet: string, title: string) => {
     await navigator.clipboard.writeText(snippet);
@@ -60,6 +40,25 @@ export default function IdeSetupPage() {
   const [newKeyName, setNewKeyName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null);
+
+  const snippetKey = newlyCreatedKey || 'oai_YOUR_KEY';
+  const quickConnectBlocks: { title: string; description: string; snippet: string }[] = [
+    {
+      title: 'Claude Code',
+      description: 'Run in your terminal:',
+      snippet: `claude mcp add --transport http orgai ${mcpUrl} --header "x-api-key: ${snippetKey}"`,
+    },
+    {
+      title: 'Cursor',
+      description: 'Add to .cursor/mcp.json:',
+      snippet: JSON.stringify({ mcpServers: { orgai: { url: mcpUrl, headers: { 'x-api-key': snippetKey } } } }, null, 2),
+    },
+    {
+      title: 'OpenAI Codex',
+      description: 'Add to ~/.codex/config.toml:',
+      snippet: `[mcp_servers.orgai]\nurl = "${mcpUrl}"\nhttp_headers = { "x-api-key" = "${snippetKey}" }`,
+    },
+  ];
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();

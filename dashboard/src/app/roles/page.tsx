@@ -324,7 +324,7 @@ export default function RolesPage() {
         open={!!roleToDelete}
         onOpenChange={(open) => !open && setRoleToDelete(null)}
         title="Delete Role"
-        description="Are you sure you want to delete this role? This cannot be undone."
+        description="Members holding this role lose its policies; child roles keep their own chain. This cannot be undone."
         confirmLabel="Delete"
         onConfirm={handleDeleteConfirm}
         isLoading={isDeleting}

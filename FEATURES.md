@@ -14,10 +14,12 @@ enforced across every agent your team runs — with the audit trail to prove it.
 - **Fail-closed by design** — unknown role, unreachable policy source, or invalid
   remote config refuses instead of silently allowing. Violations are blocked
   *before* code is written; the agent receives the reason and fix guidance
-  (`BLOCKED` / `WARNINGS`) so it self-corrects on the spot.
-- **Built-in secret/credential detection** — hardcoded API keys, passwords, and
-  connection strings caught by pattern rules. No LLM in the loop: checks are
-  deterministic, millisecond-fast, zero per-check token cost.
+  (`BLOCKED` / `WARNINGS`) so it self-corrects on the spot. At the agent layer
+  this is policy guidance plus the MCP check; the git hook and CI are the hard
+  enforcement — the agent is steered, the commit is stopped.
+- **Built-in secret/credential detection** — pattern rules for credential
+  assignments and credential-bearing URLs; extensible per org. No LLM in the
+  loop: checks are deterministic, millisecond-fast, zero per-check token cost.
 - **Role-scoped resolution** — every check evaluates against the requesting
   developer's resolved role and its inherited policy set.
 
@@ -35,8 +37,8 @@ enforced across every agent your team runs — with the audit trail to prove it.
 
 1. **MCP server (agent-side gate)** — the primary control point.
    - Two transports: streamable HTTP (`/mcp`, session header) and legacy SSE
-     (`/mcp/sse`) — works with Claude Code, Cursor, GitHub Copilot, Windsurf,
-     and any MCP-compatible agent.
+     (`/mcp/sse`) — works with Claude Code, Cursor, GitHub Copilot (agent mode,
+     via VS Code MCP), Windsurf, and any MCP-compatible agent.
    - **API mode** (with `COMPLY_API_KEY`): org policies + audit logging.
      **Standalone mode**: bundled baseline policies, no server required.
    - MCP prompts double as slash commands in supporting agents.
@@ -44,22 +46,26 @@ enforced across every agent your team runs — with the audit trail to prove it.
    - Also ships as a standalone CLI: `orgai-comply`.
 2. **Git pre-commit hook (output backstop)** — POSIX sh, checks every staged
    file against the org policy API; blocks on `ERROR`, prints warnings,
-   fail-closed if the API is unreachable, `COMPLY_SKIP=1` logged escape hatch.
+   fail-closed if the API is unreachable, `COMPLY_SKIP=1` escape hatch logged
+   to the org audit trail as `hook.bypassed`.
    Handles spaces in filenames, binary detection, missing-tool preflight.
 3. **CI mode** — the same hook runs as `./hooks/pre-commit <base> <head>` in any
    pipeline, so nothing merges unchecked even if a laptop skips the hook.
-4. **VS Code extension** — in-editor compliance surface.
+4. **VS Code extension** — optional in-editor assistant that calls external
+   cloud LLM APIs; not part of the self-hosted enforcement path.
 
 ## Audit & evidence
 
-- **Immutable audit trail** — every check, violation, login, invite, key event,
-  and webhook change logged with actor, org, action, resource, timestamp.
-- **CSV export** — audit-ready evidence for SOC 2, ISO 27001, HIPAA, and India
-  DPDP reviews. (Evidence, not certification — the honest claim.)
+- **Append-only audit trail** — every check — blocked or allowed — is logged
+  (`policy.checked`), plus every violation, login, invite, key event, and
+  webhook change, with actor, org, action, resource, timestamp.
+- **CSV export** (most recent 5,000 rows) — audit-ready evidence for SOC 2,
+  ISO 27001, HIPAA, and India DPDP reviews. (Evidence, not certification — the
+  honest claim.)
 - **Live violations feed** — real-time stream in the dashboard (who, which
   policy, which agent, severity) with mono-formatted entries.
 - **Webhooks** — pipe `policy.violated`, `policy.created/updated`,
-  `member.invited`, `audit.flagged` into Slack/SIEM/anything. HMAC-signed
+  `member.invited` into Slack/SIEM/anything. HMAC-signed
   payloads; SSRF guard rejects private/loopback/link-local targets at creation
   *and* at dispatch.
 
@@ -107,8 +113,9 @@ enforced across every agent your team runs — with the audit trail to prove it.
   unit generation documented.
 - **Ops docs** — README covers upgrade flow, `pg_dump` backup/restore, and the
   git-hook rollout; deploy reference in `DEPLOY.md`.
-- **Zero external calls** — everything runs inside the customer's network;
-  nothing phones home. Air-gap friendly.
+- **Zero external calls** — everything in the core stack runs inside the
+  customer's network; nothing phones home. Air-gap friendly (SSO via WorkOS and
+  invite email via Resend are optional online features).
 
 ## Plans & limits (built-in gating)
 

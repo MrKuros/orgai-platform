@@ -125,7 +125,7 @@ export default function LoginPage() {
               </div>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Enter your org slug first (coming soon)</p>
+              <p>SSO coming soon — configure it in Settings once enabled</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

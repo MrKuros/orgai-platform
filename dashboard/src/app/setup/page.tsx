@@ -81,6 +81,29 @@ export default function SetupWizard() {
     }
   }, [authLoading, user, currentOrg, router]);
 
+  // Persist wizard progress so a refresh resumes where the user left off.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    if (!currentOrg) return;
+    try {
+      const saved = localStorage.getItem(`orgai-setup-${currentOrg.id}`);
+      if (saved) {
+        const s = JSON.parse(saved);
+        if (typeof s.step === 'number') setStep(s.step);
+        if (Array.isArray(s.createdRoles)) setCreatedRoles(s.createdRoles);
+        if (Array.isArray(s.createdPolicyNames)) setCreatedPolicyNames(s.createdPolicyNames);
+      }
+    } catch {
+      // Corrupt saved state — start fresh.
+    }
+    setHydrated(true);
+  }, [currentOrg]);
+
+  useEffect(() => {
+    if (!hydrated || !currentOrg) return;
+    localStorage.setItem(`orgai-setup-${currentOrg.id}`, JSON.stringify({ step, createdRoles, createdPolicyNames }));
+  }, [hydrated, currentOrg, step, createdRoles, createdPolicyNames]);
+
   if (authLoading || !user || !currentOrg) {
     return <div className="flex h-screen items-center justify-center"><Spinner className="h-8 w-8" /></div>;
   }
@@ -114,14 +137,24 @@ export default function SetupWizard() {
           const role = toCreate[i];
           if (!role.inheritsFromId || idMap.has(role.inheritsFromId)) {
             const inheritsFromId = role.inheritsFromId ? idMap.get(role.inheritsFromId) : undefined;
-            const res = await createRole(currentOrg.id, {
-              name: role.name,
-              displayName: role.displayName,
-              inheritsFromId
-            });
-            idMap.set(role.id, res.role.id);
-            created.push(res.role);
-            setCreatedRoles([...created]); // persist progress for retry
+            try {
+              const res = await createRole(currentOrg.id, {
+                name: role.name,
+                displayName: role.displayName,
+                inheritsFromId
+              });
+              idMap.set(role.id, res.role.id);
+              created.push(res.role);
+              setCreatedRoles([...created]); // persist progress for retry
+            } catch (error) {
+              // Idempotent retry: a duplicate-name conflict for a role we already created is success.
+              const existing = created.find(c => c.name === role.name);
+              if (error instanceof ApiError && error.status === 409 && existing) {
+                idMap.set(role.id, existing.id);
+              } else {
+                throw error;
+              }
+            }
             toCreate.splice(i, 1);
             i--;
           }
@@ -177,7 +210,7 @@ export default function SetupWizard() {
       await inviteMember(currentOrg.id, {
         email: inviteEmail,
         membershipRole: inviteRole,
-        assignedRoleId: inviteAssignedRoleId || undefined
+        assignedRoleIds: inviteAssignedRoleId ? [inviteAssignedRoleId] : []
       });
       setInvites([...invites, { email: inviteEmail, role: inviteRole }]);
       setInviteEmail('');
@@ -187,6 +220,11 @@ export default function SetupWizard() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleFinish = () => {
+    localStorage.removeItem(`orgai-setup-${currentOrg.id}`);
+    router.push('/dashboard');
   };
 
   const handleGenerateKey = async () => {
@@ -387,13 +425,23 @@ export default function SetupWizard() {
                     <Input id="inviteEmail" placeholder="colleague@company.com" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />
                   </div>
                   <div className="space-y-2 w-[150px]">
-                    <Label htmlFor="inviteRole">Org Role</Label>
+                    <Label htmlFor="inviteRole">Access Level</Label>
                     <Select value={inviteRole} onValueChange={(val: any) => setInviteRole(val)}>
                       <SelectTrigger id="inviteRole"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="MEMBER">Member</SelectItem>
                         <SelectItem value="POLICY_ADMIN">Policy Admin</SelectItem>
                         <SelectItem value="ORG_ADMIN">Org Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2 w-[200px]">
+                    <Label htmlFor="inviteOrgRole">Organization Role (for Policies)</Label>
+                    <Select value={inviteAssignedRoleId || 'none'} onValueChange={val => setInviteAssignedRoleId(val === 'none' ? '' : val)}>
+                      <SelectTrigger id="inviteOrgRole"><SelectValue placeholder="None" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {createdRoles.map(r => <SelectItem key={r.id} value={r.id}>{r.displayName}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -435,8 +483,8 @@ export default function SetupWizard() {
                 )}
               </CardContent>
               <CardFooter className="flex justify-between border-t pt-6 bg-muted/20">
-                <Button variant="ghost" onClick={() => router.push('/dashboard')}>Skip to Dashboard</Button>
-                <Button onClick={() => router.push('/dashboard')}>
+                <Button variant="ghost" onClick={handleFinish}>Skip to Dashboard</Button>
+                <Button onClick={handleFinish}>
                   Go to Dashboard <ArrowRight className="ml-2 w-4 h-4" />
                 </Button>
               </CardFooter>

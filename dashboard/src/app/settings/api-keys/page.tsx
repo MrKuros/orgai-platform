@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import { Key, Plus, Trash2, AlertTriangle, ChevronDown } from 'lucide-react';
 
 import { useAuth, useRole } from '@/lib/auth';
-import { fetcher, createApiKey, deleteApiKey, ApiError } from '@/lib/api';
+import { fetcher, createApiKey, deleteApiKey, getApiBase, ApiError } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { AppLayout } from '@/components/layout/app-layout';
 import { PageHeader } from '@/components/layout/page-header';
@@ -22,8 +22,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Badge } from '@/components/ui/badge';
 
 type CreatePreset = 'vscode' | 'mcp' | null;
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 const AGENTS = [
   'Claude Code',
@@ -46,13 +44,12 @@ export default function ApiKeysPage() {
   const { canManageOrg } = useRole();
   const { toast } = useToast();
 
-  // Self-host MCP endpoint: same-origin /mcp/sse. Resolve on client to avoid hydration mismatch.
-  const [mcpUrl, setMcpUrl] = useState(
-    process.env.NEXT_PUBLIC_API_URL ? `${process.env.NEXT_PUBLIC_API_URL}/mcp/sse` : ''
-  );
+  // Empty NEXT_PUBLIC_API_URL means same-origin (self-host proxy) — resolve on the client to avoid hydration mismatch.
+  const [apiBase, setApiBase] = useState(process.env.NEXT_PUBLIC_API_URL || '');
   useEffect(() => {
-    if (!process.env.NEXT_PUBLIC_API_URL) setMcpUrl(`${window.location.origin}/mcp/sse`);
+    setApiBase(getApiBase());
   }, []);
+  const mcpUrl = `${apiBase}/mcp`;
 
   const { data, mutate, isLoading, error } = useSWR<any>(
     currentOrg ? `/orgs/${currentOrg.id}/api-keys` : null,
@@ -76,11 +73,23 @@ export default function ApiKeysPage() {
   const [keyToDelete, setKeyToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Remote MCP servers never receive client env — the server checks the x-api-key header.
+  const mcpSnippet = `{
+  "mcpServers": {
+    "orgai": {
+      "url": "${mcpUrl}",
+      "headers": {
+        "x-api-key": "${newlyCreatedKey || 'oai_YOUR_KEY'}"
+      }
+    }
+  }
+}`;
+
   // Open create dialog with preset
   const openCreateDialog = (preset: CreatePreset) => {
     if (preset === 'vscode') {
       setNewKeyName('VS Code Extension');
-      setNewKeyScopes(['check', 'resolve', 'admin']);
+      setNewKeyScopes(['check', 'resolve']);
     } else if (preset === 'mcp') {
       setNewKeyName('MCP Agent');
       setNewKeyScopes(['check', 'resolve']);
@@ -301,7 +310,7 @@ export default function ApiKeysPage() {
                     <li>Open VS Code Settings</li>
                     <li>Search for &quot;OrgAI&quot;</li>
                     <li>Paste your API key in <code className="bg-muted px-1 rounded text-xs">orgai.apiKey</code></li>
-                    <li>Set API URL to <code className="bg-muted px-1 rounded text-xs">{API_URL}</code></li>
+                    <li>Set API URL to <code className="bg-muted px-1 rounded text-xs">{apiBase}</code></li>
                   </ol>
                 </div>
                 {canManageOrg && (
@@ -339,28 +348,8 @@ export default function ApiKeysPage() {
                   </p>
                   <div className="bg-muted/50 rounded-lg p-4 overflow-x-auto">
                     <div className="flex items-start gap-3">
-                      <pre className="flex-1 text-sm font-mono text-left whitespace-pre">{`{
-  "mcpServers": {
-    "orgai": {
-      "url": "${mcpUrl}",
-      "env": {
-        "COMPLY_API_KEY": "${newlyCreatedKey || 'your-api-key-here'}"
-      }
-    }
-  }
-}`}</pre>
-                      <CopyButton
-                        value={`{
-  "mcpServers": {
-    "orgai": {
-      "url": "${mcpUrl}",
-      "env": {
-        "COMPLY_API_KEY": "${newlyCreatedKey || 'your-api-key-here'}"
-      }
-    }
-  }
-}`}
-                      />
+                      <pre className="flex-1 text-sm font-mono text-left whitespace-pre">{mcpSnippet}</pre>
+                      <CopyButton value={mcpSnippet} />
                     </div>
                   </div>
                 </div>
@@ -390,12 +379,12 @@ export default function ApiKeysPage() {
                     <p>The MCP server is served from this deployment. Agents that support streamable HTTP can point directly at:</p>
                     <div className="bg-muted/50 rounded-lg p-3 space-y-2">
                       <div className="flex items-center gap-2">
-                        <code className="bg-muted px-1 rounded text-xs">{mcpUrl.replace('/mcp/sse', '/mcp')}</code>
+                        <code className="bg-muted px-1 rounded text-xs">{mcpUrl}</code>
                         <span className="text-xs text-muted-foreground">(streamable HTTP)</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <code className="bg-muted px-1 rounded text-xs">{mcpUrl}</code>
-                        <span className="text-xs text-muted-foreground">(SSE)</span>
+                        <code className="bg-muted px-1 rounded text-xs">{mcpUrl}/sse</code>
+                        <span className="text-xs text-muted-foreground">(SSE — legacy agents only)</span>
                       </div>
                     </div>
                   </div>

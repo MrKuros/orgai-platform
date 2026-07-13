@@ -10,6 +10,14 @@ import {
 // ?? not ||: empty string means same-origin (self-host proxy via next.config rewrites)
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
 
+// Absolute API base for display in setup snippets: NEXT_PUBLIC_API_URL if set,
+// else the current origin (self-host proxy), else localhost during SSR.
+export function getApiBase(): string {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== 'undefined') return window.location.origin;
+  return 'http://localhost:8080';
+}
+
 export class ApiError extends Error {
   status: number;
   data: any;

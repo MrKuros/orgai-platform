@@ -175,7 +175,7 @@ export default function TeamPage() {
                 <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b">
                   <tr>
                     <th className="px-6 py-4 font-medium">Member</th>
-                    <th className="px-6 py-4 font-medium">Platform Role</th>
+                    <th className="px-6 py-4 font-medium">Access Level</th>
                     <th className="px-6 py-4 font-medium">Assigned Org Role</th>
                     <th className="px-6 py-4 font-medium text-right">Actions</th>
                   </tr>
@@ -195,7 +195,7 @@ export default function TeamPage() {
                               <div className="font-medium text-foreground flex items-center gap-2">
                                 {displayName}
                                 {isSelf && <span className="bg-primary/10 text-primary text-[10px] px-1.5 py-0.5 rounded-sm uppercase font-bold tracking-wider">You</span>}
-                                {member.pending && <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-500/40 bg-amber-500/10">Pending</Badge>}
+                                {member.pending && <Badge variant="outline" className="text-[10px] text-amber-600 dark:text-amber-400 border-amber-500/40 bg-amber-500/10">Pending</Badge>}
                               </div>
                               <div className="text-muted-foreground text-xs">{email}</div>
                             </div>
@@ -281,7 +281,7 @@ export default function TeamPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="role">Platform Access Level</Label>
+              <Label htmlFor="role">Access Level</Label>
               <Select value={inviteRole} onValueChange={(val: any) => setInviteRole(val)} disabled={isInviting}>
                 <SelectTrigger id="role">
                   <SelectValue />
@@ -324,7 +324,7 @@ export default function TeamPage() {
           </DialogHeader>
           <form onSubmit={handleChangeRole} className="space-y-4 pt-4">
             <div className="space-y-2">
-              <Label htmlFor="editRole">Platform Access Level</Label>
+              <Label htmlFor="editRole">Access Level</Label>
               <Select value={newPlatformRole} onValueChange={(val: any) => setNewPlatformRole(val)} disabled={isChanging}>
                 <SelectTrigger id="editRole">
                   <SelectValue />

@@ -1,12 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CopyButton } from '@/components/copy-button';
 import { Button } from '@/components/ui/button';
+import { getApiBase } from '@/lib/api';
 import { ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.orgai.dev';
-const MCP_URL = `${API_URL}/mcp`;
 
 type Ide = 'cursor' | 'windsurf' | 'claude' | 'opencode' | 'antigravity' | 'vscode';
 
@@ -19,75 +17,18 @@ const IDES: { id: Ide; name: string }[] = [
   { id: 'vscode', name: 'VS Code' },
 ];
 
-function getSetupCommand(apiKey: string | null): string {
-  const key = apiKey || 'YOUR_API_KEY';
-  return `curl -fsSL ${API_URL}/setup.sh | bash -s -- --key ${key}`;
+function getSetupCommand(apiKey: string | null, apiBase: string): string {
+  const key = apiKey || 'oai_YOUR_KEY';
+  return `curl -fsSL ${apiBase}/setup.sh | bash -s -- --key ${key}`;
 }
 
-function getConfigSnippet(apiKey: string | null, ide: Ide): string {
-  const key = apiKey || 'your-api-key';
-  const url = `${MCP_URL}/sse`;
+function getConfigSnippet(apiKey: string | null, ide: Ide, apiBase: string): string {
+  const key = apiKey || 'oai_YOUR_KEY';
+  const url = `${apiBase}/mcp`;
 
   switch (ide) {
-    case 'cursor':
-      return JSON.stringify({
-        mcpServers: {
-          orgai: {
-            url,
-            env: {
-              COMPLY_API_KEY: key,
-            },
-          },
-        },
-      }, null, 2);
-
-    case 'windsurf':
-      return JSON.stringify({
-        mcpServers: {
-          orgai: {
-            url,
-            env: {
-              COMPLY_API_KEY: key,
-            },
-          },
-        },
-      }, null, 2);
-
     case 'claude':
-      return JSON.stringify({
-        mcpServers: {
-          orgai: {
-            url,
-            env: {
-              COMPLY_API_KEY: key,
-            },
-          },
-        },
-      }, null, 2);
-
-    case 'opencode':
-      return JSON.stringify({
-        mcpServers: {
-          orgai: {
-            url,
-            env: {
-              COMPLY_API_KEY: key,
-            },
-          },
-        },
-      }, null, 2);
-
-    case 'antigravity':
-      return JSON.stringify({
-        mcpServers: {
-          orgai: {
-            url,
-            env: {
-              COMPLY_API_KEY: key,
-            },
-          },
-        },
-      }, null, 2);
+      return `claude mcp add orgai --transport http ${url} --header "x-api-key: ${key}"`;
 
     case 'vscode':
       return `# OrgAI Extension for VS Code
@@ -95,8 +36,21 @@ function getConfigSnippet(apiKey: string | null, ide: Ide): string {
 # After installation, add to your VS Code settings:
 {
   "orgai.apiKey": "${key}",
-  "orgai.apiUrl": "${url.replace('/sse', '')}"
+  "orgai.apiUrl": "${apiBase}"
 }`;
+
+    default:
+      // Remote MCP servers never receive client env — the server checks the x-api-key header.
+      return JSON.stringify({
+        mcpServers: {
+          orgai: {
+            url,
+            headers: {
+              'x-api-key': key,
+            },
+          },
+        },
+      }, null, 2);
   }
 }
 
@@ -107,7 +61,7 @@ function getInstructions(ide: Ide): string {
     case 'windsurf':
       return 'Add the MCP server to your Windsurf configuration at ~/.codeium/windsurf/mcp_config.json.';
     case 'claude':
-      return 'Add the MCP server to your Claude Code configuration file (~/.claude/mcp_config.json).';
+      return 'Run this command in your terminal to register the OrgAI MCP server with Claude Code.';
     case 'opencode':
       return 'Add the MCP server to your OpenCode MCP configuration file.';
     case 'antigravity':
@@ -125,8 +79,14 @@ export function IdeSetupTabs({ apiKey }: IdeSetupTabsProps) {
   const [activeTab, setActiveTab] = useState<Ide>('cursor');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const setupCommand = getSetupCommand(apiKey);
-  const currentConfig = getConfigSnippet(apiKey, activeTab);
+  // Empty NEXT_PUBLIC_API_URL means same-origin (self-host proxy) — resolve on the client to avoid hydration mismatch.
+  const [apiBase, setApiBase] = useState(process.env.NEXT_PUBLIC_API_URL || '');
+  useEffect(() => {
+    setApiBase(getApiBase());
+  }, []);
+
+  const setupCommand = getSetupCommand(apiKey, apiBase);
+  const currentConfig = getConfigSnippet(apiKey, activeTab, apiBase);
   const instructions = getInstructions(activeTab);
 
   return (
@@ -214,7 +174,7 @@ export function IdeSetupTabs({ apiKey }: IdeSetupTabsProps) {
               {/* Note about MCP URL */}
               {activeTab !== 'vscode' && (
                 <p className="text-xs text-muted-foreground">
-                  MCP endpoint: <code className="bg-muted px-1 rounded">{MCP_URL}/sse</code>
+                  MCP endpoint: <code className="bg-muted px-1 rounded">{apiBase}/mcp</code> (streamable HTTP)
                 </p>
               )}
             </div>

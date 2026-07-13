@@ -124,7 +124,7 @@ export function PolicyForm({ defaultValues, roles, onSubmit, isLoading }: Policy
                 <SelectValue placeholder="Select severity" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ERROR">ERROR - Blocks merging</SelectItem>
+                <SelectItem value="ERROR">ERROR — blocks the agent&apos;s action and the commit</SelectItem>
                 <SelectItem value="WARNING">WARNING - Flagged only</SelectItem>
               </SelectContent>
             </Select>
@@ -221,7 +221,7 @@ export function PolicyForm({ defaultValues, roles, onSubmit, isLoading }: Policy
                   <input
                     type="checkbox"
                     value={role.id}
-                    className="rounded border-gray-300 text-primary focus:ring-primary"
+                    className="rounded border-input accent-primary focus:ring-primary"
                     {...register('roleIds')}
                   />
                   <span className="text-sm font-medium">{role.displayName}</span>
