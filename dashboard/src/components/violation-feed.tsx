@@ -144,12 +144,12 @@ export function ViolationFeed() {
                     >
                       {event.violations[0]?.severity}
                     </Badge>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs font-mono text-muted-foreground">
                       {new Date(event.timestamp).toLocaleTimeString()}
                     </span>
                   </div>
                   <p className="text-sm font-medium">{event.violations[0]?.policyName}</p>
-                  <p className="text-xs text-muted-foreground">{event.violations[0]?.rule}</p>
+                  <p className="text-xs font-mono text-muted-foreground">{event.violations[0]?.rule}</p>
                   {event.violations[0]?.fixSuggestion && (
                     <p className="text-xs text-muted-foreground mt-1">
                       Fix: {event.violations[0].fixSuggestion}

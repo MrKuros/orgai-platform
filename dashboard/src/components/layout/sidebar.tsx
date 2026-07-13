@@ -1,11 +1,34 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, GitBranch, Shield, Users, Settings, Key, LogOut, Code2, Menu, X } from 'lucide-react';
+import { LayoutDashboard, GitBranch, Shield, Users, Settings, Key, LogOut, Code2, Menu, X, Sun, Moon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+
+function ThemeToggle() {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    setDark(document.documentElement.classList.contains('dark'));
+  }, []);
+  const toggle = () => {
+    const next = !dark;
+    document.documentElement.classList.toggle('dark', next);
+    try { localStorage.theme = next ? 'dark' : 'light'; } catch {}
+    setDark(next);
+  };
+  return (
+    <button
+      onClick={toggle}
+      className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md transition-colors"
+      title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+      aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
+      {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    </button>
+  );
+}
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -71,13 +94,16 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             <span className="text-sm font-medium">{user?.firstName} {user?.lastName}</span>
             <span className="text-xs text-muted-foreground truncate w-40">{user?.email}</span>
           </div>
-          <button
-            onClick={logout}
-            className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md transition-colors"
-            title="Log out"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
+          <div className="flex items-center">
+            <ThemeToggle />
+            <button
+              onClick={logout}
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md transition-colors"
+              title="Log out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
