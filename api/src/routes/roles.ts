@@ -242,7 +242,7 @@ rolesRouter.delete('/:orgId/roles/:roleId', requireAuth, requireOrgRole('ORG_ADM
   const { roleId } = req.params;
 
   const inUse = await prisma.membership.findFirst({
-    where: { orgId: req.org!.id, assignedRoleId: roleId }
+    where: { orgId: req.org!.id, assignedRoles: { some: { id: roleId } } }
   });
 
   if (inUse) {

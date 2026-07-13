@@ -36,7 +36,7 @@ membersRouter.get('/:orgId/members', requireAuth, requireOrgRole(), async (req, 
     where: { orgId: req.org!.id },
     include: {
       user: { select: { id: true, email: true, firstName: true, lastName: true, passwordHash: true, workosUserId: true } },
-      assignedRole: true
+      assignedRoles: true
     }
   });
   // pending = invited but has never set a password / linked SSO
@@ -76,8 +76,18 @@ membersRouter.post('/:orgId/members/:membershipId/invite-link', requireAuth, req
 const inviteSchema = z.object({
   email: z.string().email(),
   membershipRole: z.enum(['ORG_ADMIN', 'POLICY_ADMIN', 'MEMBER']),
-  assignedRoleId: z.string().optional()
+  assignedRoleId: z.string().optional(),        // legacy single-role callers
+  assignedRoleIds: z.array(z.string()).optional()
 });
+
+// Legacy assignedRoleId + new assignedRoleIds → one deduped list, org-verified.
+async function normalizeRoleIds(orgId: string, assignedRoleId?: string | null, assignedRoleIds?: string[]): Promise<string[]> {
+  const ids = [...new Set([...(assignedRoleIds ?? []), ...(assignedRoleId ? [assignedRoleId] : [])])];
+  if (ids.length === 0) return ids;
+  const count = await prisma.role.count({ where: { id: { in: ids }, orgId } });
+  if (count !== ids.length) throw new AppError(400, 'ERROR', 'One or more assigned roles do not belong to this organization');
+  return ids;
+}
 
 /**
  * @swagger
@@ -118,17 +128,12 @@ const inviteSchema = z.object({
  *         description: User is already a member
  */
 membersRouter.post('/:orgId/members/invite', requireAuth, requireOrgRole('ORG_ADMIN'), validate(inviteSchema), async (req, res) => {
-  const { email, membershipRole, assignedRoleId } = req.body;
+  const { email, membershipRole, assignedRoleId, assignedRoleIds } = req.body;
 
   const memberCount = await prisma.membership.count({ where: { orgId: req.org!.id } });
   assertWithinLimit(memberCount, limitsFor(req.org!.plan).members, 'Team member', req.org!.plan);
 
-  if (assignedRoleId) {
-    const role = await prisma.role.findFirst({
-      where: { id: assignedRoleId, orgId: req.org!.id }
-    });
-    if (!role) throw new AppError(400, 'ERROR', 'assignedRoleId does not belong to this organization');
-  }
+  const roleIds = await normalizeRoleIds(req.org!.id, assignedRoleId, assignedRoleIds);
 
   const existing = await prisma.user.findUnique({ where: { email } });
 
@@ -142,9 +147,12 @@ membersRouter.post('/:orgId/members/invite', requireAuth, requireOrgRole('ORG_AD
           orgId: req.org!.id,
           userId: user.id,
           role: membershipRole,
-          assignedRoleId
+          assignedRoles: { connect: roleIds.map(id => ({ id })) }
         },
-        include: { user: { select: { id: true, email: true, firstName: true, lastName: true } } }
+        include: {
+          user: { select: { id: true, email: true, firstName: true, lastName: true } },
+          assignedRoles: true
+        }
       });
       return { user, membership };
     });
@@ -175,7 +183,8 @@ membersRouter.post('/:orgId/members/invite', requireAuth, requireOrgRole('ORG_AD
 
 const updateMemberSchema = z.object({
   membershipRole: z.enum(['ORG_ADMIN', 'POLICY_ADMIN', 'MEMBER']).optional(),
-  assignedRoleId: z.string().optional().nullable()
+  assignedRoleId: z.string().optional().nullable(), // legacy single-role callers
+  assignedRoleIds: z.array(z.string()).optional()
 });
 
 /**
@@ -218,9 +227,10 @@ const updateMemberSchema = z.object({
  */
 membersRouter.patch('/:orgId/members/:userId', requireAuth, requireOrgRole('ORG_ADMIN'), validate(updateMemberSchema), async (req, res) => {
   const { userId } = req.params;
-  const { membershipRole, assignedRoleId } = req.body as {
+  const { membershipRole, assignedRoleId, assignedRoleIds } = req.body as {
     membershipRole?: 'ORG_ADMIN' | 'POLICY_ADMIN' | 'MEMBER';
     assignedRoleId?: string | null;
+    assignedRoleIds?: string[];
   };
 
   // Block demoting the last ORG_ADMIN out of the admin role.
@@ -238,21 +248,22 @@ membersRouter.patch('/:orgId/members/:userId', requireAuth, requireOrgRole('ORG_
     }
   }
 
-  // Verify assignedRoleId belongs to this org before assigning.
-  if (assignedRoleId) {
-    const role = await prisma.role.findFirst({
-      where: { id: assignedRoleId, orgId: req.org!.id }
-    });
-    if (!role) throw new AppError(400, 'ERROR', 'assignedRoleId does not belong to this organization');
-  }
-
-  const data: { role?: 'ORG_ADMIN' | 'POLICY_ADMIN' | 'MEMBER'; assignedRoleId?: string | null } = {};
+  const data: any = {};
   if (membershipRole !== undefined) data.role = membershipRole;
-  if (assignedRoleId !== undefined) data.assignedRoleId = assignedRoleId;
+  // Role assignment: assignedRoleIds replaces the set; legacy assignedRoleId
+  // maps to a one-element set (or clears it when explicitly null).
+  if (assignedRoleIds !== undefined) {
+    const ids = await normalizeRoleIds(req.org!.id, null, assignedRoleIds);
+    data.assignedRoles = { set: ids.map(id => ({ id })) };
+  } else if (assignedRoleId !== undefined) {
+    const ids = await normalizeRoleIds(req.org!.id, assignedRoleId, []);
+    data.assignedRoles = { set: ids.map(id => ({ id })) };
+  }
 
   const membership = await prisma.membership.update({
     where: { orgId_userId: { orgId: req.org!.id, userId } },
-    data
+    data,
+    include: { assignedRoles: true }
   });
 
   await writeAuditLog({

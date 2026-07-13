@@ -26,12 +26,11 @@ export interface Membership {
   orgId: string;
   userId: string;
   role: MembershipRole;
-  assignedRoleId: string | null;
   createdAt: string;
   updatedAt: string;
   org: Organization;
   user?: User;
-  assignedRole?: Role | null;
+  assignedRoles?: Role[];
 }
 
 export interface Role {
@@ -140,12 +139,14 @@ export interface UpdatePolicyInput extends Omit<Partial<CreatePolicyInput>, 'eva
 export interface InviteMemberInput {
   email: string;
   membershipRole: MembershipRole;
-  assignedRoleId?: string;
+  assignedRoleId?: string;       // legacy single-role
+  assignedRoleIds?: string[];
 }
 
 export interface UpdateMemberInput {
   membershipRole?: MembershipRole;
-  assignedRoleId?: string | null;
+  assignedRoleId?: string | null; // legacy single-role
+  assignedRoleIds?: string[];
 }
 
 export interface CreateApiKeyInput {

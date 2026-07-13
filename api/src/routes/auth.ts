@@ -527,7 +527,7 @@ authRouter.get('/me', requireAuth, async (req, res) => {
     where: { id: req.user!.id },
     include: {
       memberships: {
-        include: { org: true, assignedRole: true }
+        include: { org: true, assignedRoles: true }
       }
     }
   });

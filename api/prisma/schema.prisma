@@ -87,13 +87,14 @@ model Membership {
   orgId          String
   userId         String
   role           MembershipRole   @default(MEMBER)
-  assignedRoleId String?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
   org            Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
   user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  assignedRole   Role?            @relation(fields: [assignedRoleId], references: [id])
+  // A member can sit under multiple superiors (matrix orgs) — checks resolve
+  // the union of every assigned role's inheritance chain.
+  assignedRoles  Role[]           @relation("MembershipAssignedRoles")
 
   @@unique([orgId, userId])
 }
@@ -117,7 +118,7 @@ model Role {
   inheritsFrom  Role?          @relation("RoleInheritance", fields: [inheritsFromId], references: [id])
   children      Role[]         @relation("RoleInheritance")
   bindings      PolicyBinding[]
-  memberships   Membership[]
+  memberships   Membership[]   @relation("MembershipAssignedRoles")
 
   @@unique([orgId, name])
 }

@@ -36,7 +36,7 @@ export default function TeamPage() {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'ORG_ADMIN' | 'POLICY_ADMIN' | 'MEMBER'>('MEMBER');
-  const [inviteAssignedRoleId, setInviteAssignedRoleId] = useState<string>('none');
+  const [inviteAssignedRoleIds, setInviteAssignedRoleIds] = useState<string[]>([]);
   const [isInviting, setIsInviting] = useState(false);
 
   // Delete state
@@ -47,7 +47,32 @@ export default function TeamPage() {
   const [memberToChange, setMemberToChange] = useState<any | null>(null);
   const [isChanging, setIsChanging] = useState(false);
   const [newPlatformRole, setNewPlatformRole] = useState<'ORG_ADMIN' | 'POLICY_ADMIN' | 'MEMBER'>('MEMBER');
-  const [newAssignedRole, setNewAssignedRole] = useState<string>('none');
+  const [newAssignedRoleIds, setNewAssignedRoleIds] = useState<string[]>([]);
+
+  const toggleId = (ids: string[], id: string) =>
+    ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id];
+
+  // Checkbox list of org roles — a member can hold several (multiple superiors).
+  const RolePicker = ({ selected, onToggle, disabled, idPrefix }: {
+    selected: string[]; onToggle: (id: string) => void; disabled: boolean; idPrefix: string;
+  }) => (
+    <div className="border rounded-md divide-y max-h-44 overflow-y-auto">
+      {roles.length === 0 && <p className="text-xs text-muted-foreground p-3">No org roles defined yet.</p>}
+      {roles.map((r: any) => (
+        <label key={r.id} htmlFor={`${idPrefix}-${r.id}`} className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-muted/50">
+          <input
+            id={`${idPrefix}-${r.id}`}
+            type="checkbox"
+            className="h-4 w-4 accent-primary"
+            checked={selected.includes(r.id)}
+            onChange={() => onToggle(r.id)}
+            disabled={disabled}
+          />
+          {r.displayName}
+        </label>
+      ))}
+    </div>
+  );
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,13 +83,13 @@ export default function TeamPage() {
       await inviteMember(currentOrg.id, {
         email: inviteEmail,
         membershipRole: inviteRole,
-        assignedRoleId: inviteAssignedRoleId === 'none' ? undefined : inviteAssignedRoleId
+        assignedRoleIds: inviteAssignedRoleIds
       });
       mutateMembers();
       setIsInviteOpen(false);
       setInviteEmail('');
       setInviteRole('MEMBER');
-      setInviteAssignedRoleId('none');
+      setInviteAssignedRoleIds([]);
       toast({ title: 'Invitation sent', description: `Added ${inviteEmail} to the team.` });
     } catch (error) {
       toast({ title: 'Error inviting member', description: error instanceof ApiError ? error.message : 'Unknown error', variant: 'destructive' });
@@ -96,7 +121,7 @@ export default function TeamPage() {
     try {
       await updateMember(currentOrg.id, memberToChange.userId, {
         membershipRole: newPlatformRole,
-        assignedRoleId: newAssignedRole === 'none' ? null : newAssignedRole
+        assignedRoleIds: newAssignedRoleIds
       });
       mutateMembers();
       setMemberToChange(null);
@@ -122,7 +147,7 @@ export default function TeamPage() {
   const openChangeRoleDialog = (member: any) => {
     setMemberToChange(member);
     setNewPlatformRole(member.role);
-    setNewAssignedRole(member.assignedRoleId || 'none');
+    setNewAssignedRoleIds((member.assignedRoles || []).map((r: any) => r.id));
   };
 
   return (
@@ -182,10 +207,11 @@ export default function TeamPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          {member.assignedRole ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full bg-green-500" />
-                              <span className="font-medium">{member.assignedRole.displayName}</span>
+                          {member.assignedRoles?.length ? (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {member.assignedRoles.map((r: any) => (
+                                <Badge key={r.id} variant="secondary" className="font-medium">{r.displayName}</Badge>
+                              ))}
                             </div>
                           ) : (
                             <span className="text-muted-foreground italic">None</span>
@@ -268,19 +294,14 @@ export default function TeamPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="assignedRole">Organization Role (for Policies)</Label>
-              <Select value={inviteAssignedRoleId} onValueChange={setInviteAssignedRoleId} disabled={isInviting}>
-                <SelectTrigger id="assignedRole">
-                  <SelectValue placeholder="Select an org role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {roles.map((r: any) => (
-                    <SelectItem key={r.id} value={r.id}>{r.displayName}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">This determines which compliance rules apply to them.</p>
+              <Label>Organization Roles (for Policies)</Label>
+              <RolePicker
+                selected={inviteAssignedRoleIds}
+                onToggle={(id) => setInviteAssignedRoleIds(ids => toggleId(ids, id))}
+                disabled={isInviting}
+                idPrefix="invite-role"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Pick one or more — policies from every selected role&apos;s chain apply.</p>
             </div>
             <DialogFooter className="mt-6">
               <Button type="button" variant="outline" onClick={() => setIsInviteOpen(false)} disabled={isInviting}>Cancel</Button>
@@ -316,18 +337,14 @@ export default function TeamPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="editAssignedRole">Organization Role (for Policies)</Label>
-              <Select value={newAssignedRole} onValueChange={setNewAssignedRole} disabled={isChanging}>
-                <SelectTrigger id="editAssignedRole">
-                  <SelectValue placeholder="Select an org role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {roles.map((r: any) => (
-                    <SelectItem key={r.id} value={r.id}>{r.displayName}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Organization Roles (for Policies)</Label>
+              <RolePicker
+                selected={newAssignedRoleIds}
+                onToggle={(id) => setNewAssignedRoleIds(ids => toggleId(ids, id))}
+                disabled={isChanging}
+                idPrefix="edit-role"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Pick one or more — policies from every selected role&apos;s chain apply.</p>
             </div>
             <DialogFooter className="mt-6">
               <Button type="button" variant="outline" onClick={() => setMemberToChange(null)} disabled={isChanging}>Cancel</Button>
