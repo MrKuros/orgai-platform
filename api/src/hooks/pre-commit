@@ -1,0 +1,126 @@
+#!/bin/sh
+# OrgAI compliance pre-commit hook.
+# Checks staged files against org policies via the OrgAI API — catches
+# non-compliant code even if the AI agent skipped its MCP check.
+#
+# Setup (per repo):   cp pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+# Setup (global):     git config core.hooksPath <dir containing this file>
+#
+# Config (env or git config orgai.*):
+#   COMPLY_API_URL   OrgAI server, default http://localhost:8080
+#   COMPLY_API_KEY   org API key (required)
+#   COMPLY_ROLE      role to check as, default junior
+#   COMPLY_SKIP=1    bypass this hook once (or git commit --no-verify)
+#
+# CI mode: pre-commit <base-ref> <head-ref>  checks the diff between two refs.
+
+[ "$COMPLY_SKIP" = "1" ] && exit 0
+
+API_URL="${COMPLY_API_URL:-$(git config orgai.apiurl || true)}"
+API_URL="${API_URL:-http://localhost:8080}"
+API_KEY="${COMPLY_API_KEY:-$(git config orgai.apikey || true)}"
+ROLE="${COMPLY_ROLE:-$(git config orgai.role || true)}"
+ROLE="${ROLE:-junior}"
+
+if [ -z "$API_KEY" ]; then
+  echo "orgai: COMPLY_API_KEY not set (env or 'git config orgai.apikey') — skipping compliance check" >&2
+  exit 0
+fi
+
+# Preflight: without curl, or without any JSON encoder (python3/node), we can't
+# check reliably. Warn and skip (like the missing-key path) instead of blocking
+# every commit with a cryptic error — common on Windows Git Bash minimal installs.
+if ! command -v curl >/dev/null 2>&1; then
+  echo "orgai: curl not found — skipping compliance check (install curl to enable it)" >&2
+  exit 0
+fi
+if ! command -v python3 >/dev/null 2>&1 && ! command -v node >/dev/null 2>&1; then
+  echo "orgai: need python3 or node to build the request — skipping compliance check" >&2
+  exit 0
+fi
+
+if [ -n "$1" ] && [ -n "$2" ]; then
+  FILES=$(git diff --name-only --diff-filter=ACMR "$1" "$2")
+  SRC="$2"
+else
+  FILES=$(git diff --cached --name-only --diff-filter=ACMR)
+  SRC=":"
+fi
+
+[ -z "$FILES" ] && exit 0
+
+# The while-read loop runs in a subshell (piped), so a FAILED variable set
+# inside it would not survive. Carry the fail state out via a marker file.
+FAILMARK=$(mktemp)
+trap 'rm -f "$FAILMARK"' EXIT
+
+# Iterate line-by-line so filenames with spaces stay intact (a `for f in $FILES`
+# word-split would produce bogus paths -> empty git show -> silently skipped =
+# compliance bypass).
+printf '%s\n' "$FILES" | while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  case "$SRC" in
+    :) CONTENT=$(git show ":$f" 2>/dev/null) ;;
+    *) CONTENT=$(git show "$SRC:$f" 2>/dev/null) ;;
+  esac
+  [ -z "$CONTENT" ] && continue
+  [ "$(printf '%s' "$CONTENT" | wc -c)" -gt 200000 ] && continue
+  # skip binaries: let git classify (it prints "-\t-\t" for binary in --numstat).
+  # Portable — avoids GNU/BSD-only `grep -I` (busybox lacks it, errored -> skipped
+  # every file = bypass).
+  case "$SRC" in
+    :) NUMSTAT=$(git diff --cached --numstat -- "$f" 2>/dev/null) ;;
+    *) NUMSTAT=$(git diff --numstat "$1" "$2" -- "$f" 2>/dev/null) ;;
+  esac
+  # numstat starts with a digit (added-line count) for text, "-" for binary.
+  case "$NUMSTAT" in -*) continue ;; esac
+
+  BODY=$(printf '%s' "$CONTENT" | python3 -c 'import json,sys; print(json.dumps({"type":"code","content":sys.stdin.read(),"roleName":sys.argv[1],"filePath":sys.argv[2]}))' "$ROLE" "$f" 2>/dev/null) \
+    || BODY=$(printf '%s' "$CONTENT" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.stringify({type:"code",content:s,roleName:process.argv[1],filePath:process.argv[2]})))' "$ROLE" "$f")
+
+  RESP=$(printf '%s' "$BODY" | curl -sS --max-time 10 -X POST "$API_URL/v1/orgs/_/check" \
+    -H "x-api-key: $API_KEY" -H "Content-Type: application/json" -d @-)
+
+  if [ -z "$RESP" ]; then
+    echo "orgai: cannot reach $API_URL — commit blocked. Set COMPLY_SKIP=1 to bypass." >&2
+    exit 1
+  fi
+
+  case "$RESP" in
+    *'"passed":true,"violations":[]'*) ;;
+    *'"passed":true'*)
+      echo "orgai: warnings in $f (commit allowed):" >&2
+      if command -v jq >/dev/null 2>&1; then
+        printf '%s' "$RESP" | jq -r '.violations[] | "  [\(.severity)] \(.policyName)\(if .line then " (line \(.line))" else "" end): \(.rule)"' >&2
+      else
+        printf '%s\n' "$RESP" >&2
+      fi
+      ;;
+    *'"passed":false'*)
+      echo 1 > "$FAILMARK"
+      echo "orgai: policy violations in $f:" >&2
+      if command -v jq >/dev/null 2>&1; then
+        printf '%s' "$RESP" | jq -r '.violations[] | "  [\(.severity)] \(.policyName)\(if .line then " (line \(.line))" else "" end): \(.rule)\n      fix: \(.fixSuggestion)"' >&2
+      else
+        printf '%s\n' "$RESP" >&2
+      fi
+      ;;
+    *)
+      echo "orgai: unexpected API response — commit blocked. Set COMPLY_SKIP=1 to bypass." >&2
+      printf '%s\n' "$RESP" >&2
+      exit 1
+      ;;
+  esac
+done
+# The while ran in a subshell; an `exit 1` inside it (unreachable API / bad
+# response) ends only that subshell. Its status becomes the pipeline status —
+# propagate it so those hard failures still block the commit.
+LOOP_STATUS=$?
+[ "$LOOP_STATUS" -ne 0 ] && exit "$LOOP_STATUS"
+
+if [ -s "$FAILMARK" ]; then
+  echo "" >&2
+  echo "orgai: commit blocked by ERROR-severity policy violations (already logged in the org audit trail). Fix or bypass with COMPLY_SKIP=1." >&2
+  exit 1
+fi
+exit 0
