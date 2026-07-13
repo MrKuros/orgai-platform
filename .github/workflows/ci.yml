@@ -94,7 +94,7 @@ jobs:
     name: Dashboard — E2E Tests
     runs-on: ubuntu-latest
     needs: [test-api]
-    continue-on-error: true  # not yet gating: browser e2e needs stabilization in CI
+# e2e suite is stabilized (self-seeding auth, resilient selectors) and now gates.
     services:
       postgres:
         image: postgres:15

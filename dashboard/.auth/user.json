@@ -1,0 +1,29 @@
+{
+  "cookies": [
+    {
+      "name": "orgai_has_session",
+      "value": "1",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1784534405.657553,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "http://localhost:3000",
+      "localStorage": [
+        {
+          "name": "orgai_org",
+          "value": "{\"id\":\"d8aaaf7d-772a-49b2-9fe0-05178c235b5e\",\"name\":\"E2E Org\",\"slug\":\"e2e-org\"}"
+        },
+        {
+          "name": "orgai_token",
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmMDAyNDJmYi1jNDVmLTRlNDctYmE1Yi0zZTRiOGYzZTAwMmUiLCJlbWFpbCI6ImUyZUB0ZXN0LmRldiIsImlhdCI6MTc4MzkyOTYwNSwiZXhwIjoxNzg0NTM0NDA1fQ.-4eQbJBBQGe1Ari4EtPLubAy8J3AZOIPdQlUH--VThY"
+        }
+      ]
+    }
+  ]
+}

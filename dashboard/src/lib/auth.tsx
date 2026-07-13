@@ -54,13 +54,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           const { user: me } = await getMe();
           setUser(me);
-        } catch (error) {
-          // Token is invalid or expired
-          localStorage.removeItem('orgai_token');
-          localStorage.removeItem('orgai_org');
-          document.cookie = 'orgai_has_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-          setToken(null);
-          setCachedOrg(null);
+        } catch (error: any) {
+          // Only a 401 means the token is actually invalid. A 429/5xx/network
+          // blip must NOT wipe the session — the next page load retries.
+          if (error?.status === 401) {
+            localStorage.removeItem('orgai_token');
+            localStorage.removeItem('orgai_org');
+            document.cookie = 'orgai_has_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            setToken(null);
+            setCachedOrg(null);
+          }
         }
       }
       setIsLoading(false);

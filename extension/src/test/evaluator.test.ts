@@ -123,10 +123,11 @@ describe('Evaluator', () => {
       expect(results[0].description).toMatch(/path traversal/);
     });
 
-    test('Absolute paths are blocked', () => {
+    test('Absolute paths are allowed (only ../ escapes block)', () => {
+      // The isAbsolute false-positive was removed on purpose: agents pass
+      // absolute workspace paths constantly; only real traversal escapes block.
       const results = evaluator.evaluateCode('// code', '/tmp/file.ts');
-      expect(results.length).toBe(1);
-      expect(results[0].passed).toBe(false);
+      expect(results.length).toBe(0);
     });
 
     test('Internal workspace paths pass', () => {

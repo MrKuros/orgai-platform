@@ -54,7 +54,8 @@ const createRoleSchema = z.object({
   // No commas/whitespace: role names travel as comma-separated lists in checks.
   name: z.string().min(1).regex(/^[^,\s]+$/, 'Role name cannot contain commas or whitespace'),
   displayName: z.string().min(1),
-  inheritsFromId: z.string().optional()
+  // min(1): an empty string is not a valid FK — it must be absent instead.
+  inheritsFromId: z.string().min(1).optional()
 });
 
 /**
@@ -133,7 +134,7 @@ rolesRouter.post('/:orgId/roles', requireAuth, requireOrgRole('POLICY_ADMIN', 'O
 
 const updateRoleSchema = z.object({
   displayName: z.string().min(1).optional(),
-  inheritsFromId: z.string().optional().nullable()
+  inheritsFromId: z.string().min(1).optional().nullable()
 });
 
 /**

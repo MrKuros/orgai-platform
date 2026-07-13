@@ -24,7 +24,9 @@ export function ViolationFeed() {
   const { currentOrg } = useAuth();
   const [violations, setViolations] = useState<ViolationEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
+  // Start minimized: the expanded panel floats over page content and blocks
+  // clicks (e.g. action buttons near the bottom right). Auto-expands on a violation.
+  const [isMinimized, setIsMinimized] = useState(true);
 
   useEffect(() => {
     if (!currentOrg) return;
@@ -44,6 +46,7 @@ export function ViolationFeed() {
       try {
         const data = JSON.parse(event.data) as ViolationEvent;
         setViolations(prev => [data, ...prev].slice(0, 50));
+        setIsMinimized(false);
       } catch (e) {
         console.error('Failed to parse violation event:', e);
       }
@@ -63,6 +66,7 @@ export function ViolationFeed() {
           try {
             const data = JSON.parse(event.data) as ViolationEvent;
             setViolations(prev => [data, ...prev].slice(0, 50));
+            setIsMinimized(false);
           } catch (e) {
             console.error('Failed to parse violation event:', e);
           }

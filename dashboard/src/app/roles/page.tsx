@@ -220,7 +220,8 @@ export default function RolesPage() {
             </ReactFlow>
 
             {/* Side Panel */}
-            <div className={`absolute top-0 right-0 bottom-0 w-80 bg-background border-l shadow-2xl transition-transform duration-300 transform ${selectedRoleId ? 'translate-x-0' : 'translate-x-full'}`}>
+            {/* z-30 keeps the panel's action buttons above the fixed z-20 Live Violations feed */}
+            <div className={`absolute top-0 right-0 bottom-0 w-80 z-30 bg-background border-l shadow-2xl transition-transform duration-300 transform ${selectedRoleId ? 'translate-x-0' : 'translate-x-full'}`}>
               {selectedRole && (
                 <div className="flex flex-col h-full">
                   <div className="flex items-center justify-between p-4 border-b">

@@ -38,7 +38,9 @@ export function CreateRoleDialog({ open, onOpenChange, existingRoles, onSubmit }
     formState: { errors },
   } = useForm<RoleFormValues>({
     resolver: zodResolver(roleSchema),
-    defaultValues: { name: '', displayName: '', inheritsFromId: '' },
+    // inheritsFromId must be undefined (not '') when untouched — the API treats
+    // an empty string as a real FK and the create 500s on a root role.
+    defaultValues: { name: '', displayName: '', inheritsFromId: undefined },
   });
 
   const handleFormSubmit = async (data: RoleFormValues) => {

@@ -58,21 +58,37 @@ export async function dispatchWebhook(
             .update(body)
             .digest('hex');
 
-          const response = await fetch(webhook.url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-OrgAI-Event': event,
-              'X-OrgAI-Signature': signature,
-            },
-            body,
-          });
-
-          if (!response.ok) {
-            logger.warn(`Webhook dispatch failed for ${webhook.url}`, {
-              status: response.status,
-              event
-            });
+          // Up to 3 attempts with backoff so a SIEM blip doesn't drop events.
+          // ponytail: in-memory retry only — events die with the process; add a
+          // persistent outbox if delivery guarantees ever matter contractually.
+          const delays = [0, 1_000, 4_000];
+          let delivered = false;
+          for (const delay of delays) {
+            if (delay) await new Promise(r => setTimeout(r, delay));
+            try {
+              const response = await fetch(webhook.url, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-OrgAI-Event': event,
+                  'X-OrgAI-Signature': signature,
+                },
+                body,
+                signal: AbortSignal.timeout(10_000),
+              });
+              if (response.ok) { delivered = true; break; }
+              logger.warn(`Webhook dispatch attempt failed for ${webhook.url}`, {
+                status: response.status,
+                event
+              });
+              // 4xx won't improve on retry — only retry server errors/timeouts.
+              if (response.status < 500) break;
+            } catch (err) {
+              logger.warn(`Webhook dispatch attempt errored for ${webhook.url}`, { event });
+            }
+          }
+          if (!delivered) {
+            logger.error(`Webhook delivery gave up for ${webhook.url}`, { event });
           }
         } catch (error) {
           logger.error(`Webhook delivery error for ${webhook.url}`, { error, event });

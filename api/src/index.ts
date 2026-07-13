@@ -54,13 +54,18 @@ app.use(['/mcp', '/mcp/sse', '/mcp/messages'], mcpRateLimit);
 mountMcpRoutes(app);
 
 // Rate limiting
-// Auth and API key endpoints get their own stricter limits (skip global).
-// Global limit covers everything else under /v1.
-app.use('/v1/auth', authRateLimit);
+// Credential endpoints (the brute-force surface) get the strict auth limit.
+// Token-authenticated calls like /auth/me run on every page load for every
+// user — under the strict limit a single office IP would exhaust it and lock
+// everyone out of login, so those fall through to the global limit instead.
+const isCredentialAuthPath = (p: string) =>
+  ['/signup', '/login', '/forgot-password', '/reset-password'].includes(p) || p.startsWith('/sso');
+app.use('/v1/auth', (req, res, next) =>
+  isCredentialAuthPath(req.path) ? authRateLimit(req, res, next) : next());
 app.use('/v1/orgs/:orgId/api-keys', apiKeyRateLimit);
 app.use('/v1', (req, res, next) => {
   // Skip global rate limit for paths already covered by stricter limiters
-  if (req.path.startsWith('/auth') || req.path.match(/\/orgs\/[^/]+\/api-keys/)) {
+  if ((req.path.startsWith('/auth/') && isCredentialAuthPath(req.path.slice('/auth'.length))) || req.path.match(/\/orgs\/[^/]+\/api-keys/)) {
     return next();
   }
   return globalRateLimit(req, res, next);

@@ -101,7 +101,7 @@ describe('OrgAIClient', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         'https://api.orgai.dev/v1/orgs/org-123/resolve/senior',
         expect.objectContaining({
-          method: 'GET',
+          headers: expect.objectContaining({ 'X-API-Key': 'test-api-key-12345' }),
         })
       );
       expect(result).toEqual(mockResponse);

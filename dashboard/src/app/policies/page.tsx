@@ -169,10 +169,10 @@ export default function PoliciesPage() {
                       
                       {canManagePolicies && (
                         <div className="flex gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => setEditingPolicy(policy)}>
+                          <Button variant="ghost" size="icon" aria-label="Edit policy" onClick={() => setEditingPolicy(policy)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => setPolicyToDelete(policy.id)}>
+                          <Button variant="ghost" size="icon" className="text-destructive" aria-label="Delete policy" onClick={() => setPolicyToDelete(policy.id)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
