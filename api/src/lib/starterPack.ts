@@ -35,6 +35,17 @@ export const STARTER_ROLES: StarterRole[] = [
         severity: 'ERROR',
       },
       {
+        name: 'no-credentials-in-urls',
+        rule: 'Never embed credentials in connection strings or URLs.',
+        skill: 'Connection strings must come from process.env, never inline. A URL containing user:password@ is a leaked credential the moment it is committed.',
+        evaluatorType: 'regex',
+        // scheme://user:pass@host — catches postgres://, mongodb://, amqp://, https:// etc.
+        evaluatorPattern: "[a-z][a-z0-9+.-]*:\\/\\/[^\\/\\s:@'\"]+:[^\\/\\s:@'\"]+@",
+        evaluatorFlags: 'i',
+        fixSuggestion: 'Read the full connection string from process.env.DATABASE_URL (or equivalent) instead of embedding credentials.',
+        severity: 'ERROR',
+      },
+      {
         name: 'require-unit-tests',
         rule: 'Every function that modifies data must have at least one unit test.',
         skill: 'After writing any function that creates, updates, or deletes data, always write a corresponding test file with at least one test case covering the happy path.',

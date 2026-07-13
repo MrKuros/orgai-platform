@@ -14,13 +14,23 @@
 #
 # CI mode: pre-commit <base-ref> <head-ref>  checks the diff between two refs.
 
-[ "$COMPLY_SKIP" = "1" ] && exit 0
-
 API_URL="${COMPLY_API_URL:-$(git config orgai.apiurl || true)}"
 API_URL="${API_URL:-http://localhost:8080}"
 API_KEY="${COMPLY_API_KEY:-$(git config orgai.apikey || true)}"
 ROLE="${COMPLY_ROLE:-$(git config orgai.role || true)}"
 ROLE="${ROLE:-junior}"
+
+# Bypass is allowed but recorded: fire-and-forget audit ping, then exit clean.
+if [ "$COMPLY_SKIP" = "1" ]; then
+  if [ -n "$API_KEY" ] && command -v curl >/dev/null 2>&1; then
+    REPO_NAME=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
+    curl -m 2 -s -o /dev/null -X POST "$API_URL/v1/orgs/_/hook-skip" \
+      -H "x-api-key: $API_KEY" -H 'Content-Type: application/json' \
+      -d "{\"repo\":\"${REPO_NAME:-unknown}\",\"actor\":\"${USER:-unknown}\"}" 2>/dev/null &
+  fi
+  echo "orgai: compliance check bypassed (COMPLY_SKIP=1) — recorded in org audit trail" >&2
+  exit 0
+fi
 
 if [ -z "$API_KEY" ]; then
   echo "orgai: COMPLY_API_KEY not set (env or 'git config orgai.apikey') — skipping compliance check" >&2

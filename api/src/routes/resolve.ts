@@ -31,7 +31,8 @@ export function invalidateResolveCache(orgId?: string) {
 // the result is the UNION of each role's inheritance chain. Name conflicts
 // across branches resolve strictest-wins (ERROR beats WARNING): fail-closed.
 export async function resolveRolePolicies(orgId: string, roleName: string) {
-  const names = roleName.split(',').map(n => n.trim()).filter(Boolean);
+  // Sorted so "a,b" and "b,a" hit one cache entry and tie-breaks are deterministic.
+  const names = roleName.split(',').map(n => n.trim()).filter(Boolean).sort();
   if (names.length === 0) return null;
   if (names.length === 1) return resolveSingleRole(orgId, names[0]);
 
@@ -76,6 +77,15 @@ export async function resolveRolePolicies(orgId: string, roleName: string) {
     }
   }
 
+  // Shared ancestors produce identical override warnings via each chain — dedupe.
+  const seenWarnings = new Set<string>();
+  const dedupedWarnings = warnings.filter(w => {
+    const key = `${w.policyName}|${w.overriddenByRole}|${w.originalRole}`;
+    if (seenWarnings.has(key)) return false;
+    seenWarnings.add(key);
+    return true;
+  });
+
   const responseData = {
     role: {
       id: results.map(r => r.role.id).join(','),
@@ -84,7 +94,7 @@ export async function resolveRolePolicies(orgId: string, roleName: string) {
     },
     resolvedFrom,
     policies: Array.from(policyMap.values()),
-    warnings
+    warnings: dedupedWarnings
   };
 
   cache.set(cacheKey, { data: responseData, expires: Date.now() + 5 * 60 * 1000 });
@@ -314,10 +324,40 @@ resolveRouter.post('/:orgId/check', requireApiKey, validate(checkSchema), async 
 
   const hasErrors = violations.some(v => v.severity === 'ERROR');
 
+  // Every check is audited — passed or not — so "show me all checks for
+  // developer X" has an answer. ERROR violations additionally log policy.violated.
+  await writeAuditLog({
+    orgId,
+    action: 'policy.checked',
+    metadata: {
+      roleName,
+      type,
+      filePath: filePath?.substring(0, 200),
+      passed: !hasErrors,
+      blockerCount: violations.filter(v => v.severity === 'ERROR').length,
+      warningCount: violations.filter(v => v.severity === 'WARNING').length
+    }
+  });
+
   if (hasErrors) {
     dispatchWebhook(orgId, 'policy.violated', { violations });
     broadcastViolation(orgId, { violations, timestamp: new Date().toISOString() });
   }
 
   res.json({ passed: !hasErrors, violations });
+});
+
+// Records a developer bypassing the pre-commit hook (COMPLY_SKIP=1) so the
+// escape hatch is visible in the org audit trail. Fire-and-forget from the hook.
+const hookSkipSchema = z.object({
+  repo: z.string().max(200).optional(),
+  actor: z.string().max(100).optional()
+});
+resolveRouter.post('/:orgId/hook-skip', requireApiKey, validate(hookSkipSchema), async (req, res) => {
+  await writeAuditLog({
+    orgId: req.org!.id,
+    action: 'hook.bypassed',
+    metadata: { repo: req.body.repo, actor: req.body.actor }
+  });
+  res.status(204).send();
 });

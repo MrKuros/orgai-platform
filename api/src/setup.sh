@@ -44,8 +44,11 @@ configure_json() {
         '{ mcpServers: { orgai: { url: $url, headers: { "x-api-key": $key } } } }' \
         > "$file"
     fi
+  elif [ -f "$file" ]; then
+    # No jq and the file exists — never clobber someone's other MCP servers.
+    echo "warning: $name: $file exists and jq is not installed - add the orgai server manually (see docs)." >&2
+    return
   else
-    # No jq — write fresh (safe for first-time setup)
     cat > "$file" <<EOF
 { "mcpServers": { "orgai": { "url": "$MCP_URL", "headers": { "x-api-key": "$API_KEY" } } } }
 EOF
@@ -61,8 +64,11 @@ EOF
 
 # Claude Code (prefer CLI if available)
 if command -v claude &>/dev/null; then
-  claude mcp add orgai --transport http "$MCP_URL" --header "x-api-key: $API_KEY" --scope user 2>/dev/null || true
-  CONFIGURED+=("Claude Code")
+  if claude mcp add orgai --transport http "$MCP_URL" --header "x-api-key: $API_KEY" --scope user >/dev/null 2>&1; then
+    CONFIGURED+=("Claude Code")
+  else
+    echo "warning: Claude Code: 'claude mcp add' failed - add the server manually (see docs)." >&2
+  fi
 fi
 
 # OpenCode
@@ -79,6 +85,9 @@ configure_opencode() {
           '{ mcp: { orgai: { type: "remote", url: $url, headers: { "x-api-key": $key } } } }' \
           > "$file"
       fi
+    elif [ -f "$file" ]; then
+      echo "warning: OpenCode: $file exists and jq is not installed - add the orgai server manually (see docs)." >&2
+      return
     else
       cat > "$file" <<EOF
 { "mcp": { "orgai": { "type": "remote", "url": "$MCP_URL", "headers": { "x-api-key": "$API_KEY" } } } }
@@ -91,6 +100,29 @@ configure_opencode
 
 # Antigravity
 [ -d "$HOME/.gemini" ] && configure_json "$HOME/.gemini/config/mcp_config.json" "Antigravity"
+
+# VS Code / GitHub Copilot agent mode — .vscode/mcp.json in the current repo.
+if git rev-parse --show-toplevel >/dev/null 2>&1; then
+  REPO_ROOT="$(git rev-parse --show-toplevel)"
+  VSCODE_MCP="$REPO_ROOT/.vscode/mcp.json"
+  mkdir -p "$REPO_ROOT/.vscode"
+  if command -v jq &>/dev/null; then
+    if [ -f "$VSCODE_MCP" ]; then
+      jq --arg url "$MCP_URL" --arg key "$API_KEY" \
+        '.servers.orgai = { type: "http", url: $url, headers: { "x-api-key": $key } }' \
+        "$VSCODE_MCP" > "$VSCODE_MCP.tmp" && mv "$VSCODE_MCP.tmp" "$VSCODE_MCP"
+      CONFIGURED+=("VS Code/Copilot (agent mode)")
+    else
+      printf '{ "servers": { "orgai": { "type": "http", "url": "%s", "headers": { "x-api-key": "%s" } } } }\n' "$MCP_URL" "$API_KEY" > "$VSCODE_MCP"
+      CONFIGURED+=("VS Code/Copilot (agent mode)")
+    fi
+  elif [ -f "$VSCODE_MCP" ]; then
+    echo "warning: VS Code: $VSCODE_MCP exists and jq is not installed - add the orgai server manually (see docs)." >&2
+  else
+    printf '{ "servers": { "orgai": { "type": "http", "url": "%s", "headers": { "x-api-key": "%s" } } } }\n' "$MCP_URL" "$API_KEY" > "$VSCODE_MCP"
+    CONFIGURED+=("VS Code/Copilot (agent mode)")
+  fi
+fi
 
 # Git pre-commit hook — the commit backstop. Installs into the current repo.
 HOOK_MSG="ℹ️  Not inside a git repo — rerun this script inside each repo to install the pre-commit hook."

@@ -51,7 +51,8 @@ rolesRouter.get('/:orgId/roles', authOrApiKey, requireOrgAccess, async (req, res
 });
 
 const createRoleSchema = z.object({
-  name: z.string().min(1),
+  // No commas/whitespace: role names travel as comma-separated lists in checks.
+  name: z.string().min(1).regex(/^[^,\s]+$/, 'Role name cannot contain commas or whitespace'),
   displayName: z.string().min(1),
   inheritsFromId: z.string().optional()
 });

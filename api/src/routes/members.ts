@@ -137,10 +137,11 @@ membersRouter.post('/:orgId/members/invite', requireAuth, requireOrgRole('ORG_AD
 
   const existing = await prisma.user.findUnique({ where: { email } });
 
+  let user: any, membership: any;
   try {
     // Create user + membership atomically so a failed membership doesn't
     // orphan a freshly-created user.
-    const { user, membership } = await prisma.$transaction(async (tx) => {
+    ({ user, membership } = await prisma.$transaction(async (tx) => {
       const user = existing ?? await tx.user.create({ data: { email } });
       const membership = await tx.membership.create({
         data: {
@@ -155,30 +156,37 @@ membersRouter.post('/:orgId/members/invite', requireAuth, requireOrgRole('ORG_AD
         }
       });
       return { user, membership };
-    });
-
-    await writeAuditLog({
-      orgId: req.org!.id,
-      actorId: req.user!.id,
-      action: 'member.invited',
-      resource: user.id,
-      metadata: { role: membershipRole }
-    });
-
-    dispatchWebhook(req.org!.id, 'member.invited', { membership });
-
-    // Invite email: new users get a set-password link; existing users can log in already
-    if (!user.passwordHash && !user.workosUserId) {
-      const inviteToken = await createAuthToken(user.id, 'INVITE', req.org!.id);
-      const inviter = await prisma.user.findUnique({ where: { id: req.user!.id } });
-      const inviterName = inviter?.firstName ? `${inviter.firstName} ${inviter.lastName ?? ''}`.trim() : 'A teammate';
-      await sendInviteEmail(email, req.org!.name, inviterName, inviteToken);
+    }));
+  } catch (error: any) {
+    // Only a duplicate membership is "already a member"; anything else
+    // (deleted role mid-flight, DB failure) must surface as itself.
+    if (error?.code === 'P2002') {
+      throw new AppError(409, 'ERROR', 'User is already a member of this organization');
     }
-
-    res.status(201).json({ membership });
-  } catch (error) {
-    throw new AppError(409, 'ERROR', 'User is already a member of this organization');
+    throw error;
   }
+
+  // Post-create side effects live outside the try: a failing email or audit
+  // write must not mislabel a successful invite as a 409.
+  await writeAuditLog({
+    orgId: req.org!.id,
+    actorId: req.user!.id,
+    action: 'member.invited',
+    resource: user.id,
+    metadata: { role: membershipRole }
+  });
+
+  dispatchWebhook(req.org!.id, 'member.invited', { membership });
+
+  // Invite email: new users get a set-password link; existing users can log in already
+  if (!user.passwordHash && !user.workosUserId) {
+    const inviteToken = await createAuthToken(user.id, 'INVITE', req.org!.id);
+    const inviter = await prisma.user.findUnique({ where: { id: req.user!.id } });
+    const inviterName = inviter?.firstName ? `${inviter.firstName} ${inviter.lastName ?? ''}`.trim() : 'A teammate';
+    await sendInviteEmail(email, req.org!.name, inviterName, inviteToken);
+  }
+
+  res.status(201).json({ membership });
 });
 
 const updateMemberSchema = z.object({

@@ -21,6 +21,12 @@ fi
 
 # 1. Postgres — matches api/.env (postgresql://orgai:orgai@localhost:5432/orgai)
 if ! $DOCKER ps --format '{{.Names}}' | grep -qx "$DB_CONTAINER"; then
+  # Port already taken by something that isn't our container → bail with a hint,
+  # or migrations would silently target a stranger's postgres.
+  if command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | grep -q ':5432 '; then
+    echo "error: port 5432 is already in use (a local postgres?). Stop it or remove it, then re-run." >&2
+    exit 1
+  fi
   if $DOCKER ps -a --format '{{.Names}}' | grep -qx "$DB_CONTAINER"; then
     $DOCKER start "$DB_CONTAINER" >/dev/null
   else
@@ -30,10 +36,15 @@ if ! $DOCKER ps --format '{{.Names}}' | grep -qx "$DB_CONTAINER"; then
   fi
 fi
 printf "waiting for postgres"
+DB_UP=0
 for _ in $(seq 1 30); do
-  if $DOCKER exec "$DB_CONTAINER" pg_isready -U orgai -q 2>/dev/null; then break; fi
+  if $DOCKER exec "$DB_CONTAINER" pg_isready -U orgai -q 2>/dev/null; then DB_UP=1; break; fi
   printf "."; sleep 1
 done
+if [ "$DB_UP" != "1" ]; then
+  echo " FAILED — postgres did not come up in 30s. Check: $DOCKER logs $DB_CONTAINER" >&2
+  exit 1
+fi
 echo " up."
 
 # 2. Dependencies (workspace root install covers api + dashboard + core)

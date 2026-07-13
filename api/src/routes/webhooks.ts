@@ -46,7 +46,7 @@ webhooksRouter.get('/:orgId/webhooks', requireAuth, requireOrgRole('ORG_ADMIN'),
 
 const createWebhookSchema = z.object({
   url: z.string().url(),
-  events: z.array(z.enum(['policy.violated', 'policy.created', 'policy.updated', 'member.invited', 'audit.flagged'])).min(1)
+  events: z.array(z.enum(['policy.violated', 'policy.created', 'policy.updated', 'member.invited'])).min(1)
 });
 
 /**
@@ -79,7 +79,7 @@ const createWebhookSchema = z.object({
  *                 type: array
  *                 items:
  *                   type: string
- *                   enum: [policy.violated, policy.updated, member.invited, audit.flagged]
+ *                   enum: [policy.violated, policy.created, policy.updated, member.invited]
  *     responses:
  *       201:
  *         description: Webhook created
@@ -114,7 +114,7 @@ webhooksRouter.post('/:orgId/webhooks', requireAuth, requireOrgRole('ORG_ADMIN')
 
 const updateWebhookSchema = z.object({
   url: z.string().url().optional(),
-  events: z.array(z.enum(['policy.violated', 'policy.created', 'policy.updated', 'member.invited', 'audit.flagged'])).min(1).optional(),
+  events: z.array(z.enum(['policy.violated', 'policy.created', 'policy.updated', 'member.invited'])).min(1).optional(),
   active: z.boolean().optional()
 });
 
@@ -152,7 +152,7 @@ const updateWebhookSchema = z.object({
  *                 type: array
  *                 items:
  *                   type: string
- *                   enum: [policy.violated, policy.updated, member.invited, audit.flagged]
+ *                   enum: [policy.violated, policy.created, policy.updated, member.invited]
  *               active:
  *                 type: boolean
  *     responses:
