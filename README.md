@@ -10,6 +10,44 @@ Your developers use Claude Code, Cursor, Copilot, Windsurf. OrgAI lets the organ
 - **Roles that match your org**: policies attach to roles, roles inherit, and a member can hold multiple roles across departments — union of policies, strictest wins.
 - **Self-hosted**: runs in your VPC or fully air-gapped. Your code never leaves your infrastructure. Policy checks are deterministic pattern/AST rules — no LLM calls, no token spend, sub-second.
 
+## Where it sits
+
+```mermaid
+flowchart LR
+    ADMIN[Compliance admin]
+
+    subgraph devm [Developer machine]
+        DEV[Developer]
+        AGENT["AI agent
+        Claude Code · Cursor · Copilot · Windsurf"]
+        REPO[(local repo)]
+        HOOK[pre-commit hook]
+        DEV -->|prompt| AGENT
+        AGENT -->|writes code| REPO
+        REPO -->|git commit| HOOK
+    end
+
+    subgraph orginfra [Your infrastructure — self-hosted / air-gapped]
+        API[OrgAI API + MCP server]
+        DB[("PostgreSQL
+        policies · roles · audit trail")]
+        DASH[Dashboard]
+        DASH --- API
+        API --- DB
+    end
+
+    CI[CI pipeline]
+
+    ADMIN -->|"defines policies, roles, sees audit trail"| DASH
+    AGENT <-.->|"① MCP: agent checks policy BEFORE writing (steering)"| API
+    HOOK <-->|"② hard gate: violating commit blocked"| API
+    CI <-->|"③ hard gate: violating build fails"| API
+    REPO -->|git push| CI
+```
+
+**①** Agent asks OrgAI what the developer's role allows *before* generating code — advisory steering, catches violations at the source.
+**②③** Git hook and CI re-check deterministically — the hard enforcement. An agent (or human) that ignores steering gets blocked at commit and again at build. Every check and every bypass lands in the audit trail.
+
 ## Architecture
 
 ```text
