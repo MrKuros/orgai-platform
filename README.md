@@ -2,6 +2,8 @@
 
 **Self-hosted AI compliance enforcement for engineering teams.**
 
+**[orgai.dev](https://orgai.dev)** — product overview and early access for companies.
+
 Your developers use Claude Code, Cursor, Copilot, Windsurf. OrgAI lets the organization define coding policies once — centrally, per role — and enforces them across every AI agent, every commit, and every CI run. With an append-only audit trail of what was checked, what was blocked, and who bypassed what.
 
 - **Steer the agents**: an MCP server any MCP-compatible agent connects to (Claude Code, Cursor, Copilot agent mode, Windsurf) — agents check policy before writing code.
@@ -117,4 +119,4 @@ GitHub Actions builds and tests everything on every push: API (against a real Po
 
 [MIT](LICENSE) — use it, fork it, run it inside your company.
 
-Paid deployment, policy tuning, and support: **kashish.patel@orgai.dev**
+Running this in your company? Paid deployment, policy tuning, and support: **kashish.patel@orgai.dev** · [orgai.dev](https://orgai.dev)
