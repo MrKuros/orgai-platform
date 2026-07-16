@@ -192,7 +192,10 @@ membersRouter.post('/:orgId/members/invite', requireAuth, requireOrgRole('ORG_AD
 const updateMemberSchema = z.object({
   membershipRole: z.enum(['ORG_ADMIN', 'POLICY_ADMIN', 'MEMBER']).optional(),
   assignedRoleId: z.string().optional().nullable(), // legacy single-role callers
-  assignedRoleIds: z.array(z.string()).optional()
+  assignedRoleIds: z.array(z.string()).optional(),
+  // false deactivates: dashboard access and member-bound API keys stop working;
+  // history stays. true reactivates.
+  active: z.boolean().optional()
 });
 
 /**
@@ -235,10 +238,11 @@ const updateMemberSchema = z.object({
  */
 membersRouter.patch('/:orgId/members/:userId', requireAuth, requireOrgRole('ORG_ADMIN'), validate(updateMemberSchema), async (req, res) => {
   const { userId } = req.params;
-  const { membershipRole, assignedRoleId, assignedRoleIds } = req.body as {
+  const { membershipRole, assignedRoleId, assignedRoleIds, active } = req.body as {
     membershipRole?: 'ORG_ADMIN' | 'POLICY_ADMIN' | 'MEMBER';
     assignedRoleId?: string | null;
     assignedRoleIds?: string[];
+    active?: boolean;
   };
 
   // Block demoting the last ORG_ADMIN out of the admin role.
@@ -248,7 +252,7 @@ membersRouter.patch('/:orgId/members/:userId', requireAuth, requireOrgRole('ORG_
     });
     if (current?.role === 'ORG_ADMIN') {
       const adminCount = await prisma.membership.count({
-        where: { orgId: req.org!.id, role: 'ORG_ADMIN' }
+        where: { orgId: req.org!.id, role: 'ORG_ADMIN', active: true }
       });
       if (adminCount <= 1) {
         throw new AppError(409, 'ERROR', 'Cannot demote the last ORG_ADMIN');
@@ -256,8 +260,26 @@ membersRouter.patch('/:orgId/members/:userId', requireAuth, requireOrgRole('ORG_
     }
   }
 
+  if (active === false) {
+    if (userId === req.user!.id) {
+      throw new AppError(409, 'ERROR', 'You cannot deactivate yourself');
+    }
+    const current = await prisma.membership.findUnique({
+      where: { orgId_userId: { orgId: req.org!.id, userId } }
+    });
+    if (current?.role === 'ORG_ADMIN') {
+      const adminCount = await prisma.membership.count({
+        where: { orgId: req.org!.id, role: 'ORG_ADMIN', active: true }
+      });
+      if (adminCount <= 1) {
+        throw new AppError(409, 'ERROR', 'Cannot deactivate the last ORG_ADMIN');
+      }
+    }
+  }
+
   const data: any = {};
   if (membershipRole !== undefined) data.role = membershipRole;
+  if (active !== undefined) data.active = active;
   // Role assignment: assignedRoleIds replaces the set; legacy assignedRoleId
   // maps to a one-element set (or clears it when explicitly null).
   if (assignedRoleIds !== undefined) {
@@ -277,7 +299,7 @@ membersRouter.patch('/:orgId/members/:userId', requireAuth, requireOrgRole('ORG_
   await writeAuditLog({
     orgId: req.org!.id,
     actorId: req.user!.id,
-    action: 'member.updated',
+    action: active === undefined ? 'member.updated' : (active ? 'member.reactivated' : 'member.deactivated'),
     resource: userId
   });
 

@@ -216,7 +216,8 @@ const checkSchema = z.object({
   type: z.enum(['code', 'command']),
   content: z.string(),
   filePath: z.string().optional(),
-  roleName: z.string()
+  // Optional for member-bound keys — the member's assigned roles are used.
+  roleName: z.string().optional()
 });
 
 /**
@@ -269,8 +270,22 @@ const checkSchema = z.object({
  *         description: Role not found
  */
 resolveRouter.post('/:orgId/check', requireApiKey, validate(checkSchema), async (req, res) => {
-  const { type, content, filePath, roleName } = req.body;
+  const { type, content, filePath } = req.body;
   const orgId = req.org!.id;
+
+  // A member-bound key ALWAYS checks as that member's assigned roles — a
+  // client-supplied roleName must not be able to select a weaker policy set.
+  const boundMember = req.apiKeyRecord?.member;
+  const roleName: string | undefined = boundMember
+    ? boundMember.assignedRoles.map(r => r.name).sort().join(',')
+    : req.body.roleName;
+  if (!roleName) {
+    throw new AppError(400, 'ERROR', boundMember
+      ? 'This developer has no assigned roles — assign one in the dashboard first'
+      : 'roleName is required when using an org-wide API key');
+  }
+  // Member-bound checks are attributed to the developer in the audit trail.
+  const actorId = boundMember?.userId;
 
   await meterEvaluation(orgId, req.org!.plan);
 
@@ -323,6 +338,7 @@ resolveRouter.post('/:orgId/check', requireApiKey, validate(checkSchema), async 
         // policy's noise ("how often would this have blocked?") before enforcing.
         await writeAuditLog({
           orgId,
+          actorId,
           action: 'policy.shadow_violated',
           metadata: {
             policyId: policy.id,
@@ -335,6 +351,7 @@ resolveRouter.post('/:orgId/check', requireApiKey, validate(checkSchema), async 
       } else if (policy.severity === 'ERROR') {
         await writeAuditLog({
           orgId,
+          actorId,
           action: 'policy.violated',
           metadata: { policyId: policy.id, contentSnippet: content.substring(0, 100) }
         });
@@ -351,6 +368,7 @@ resolveRouter.post('/:orgId/check', requireApiKey, validate(checkSchema), async 
   // developer X" has an answer. ERROR violations additionally log policy.violated.
   await writeAuditLog({
     orgId,
+    actorId,
     action: 'policy.checked',
     metadata: {
       roleName,
@@ -380,10 +398,12 @@ const hookSkipSchema = z.object({
   actor: z.string().max(100).optional()
 });
 resolveRouter.post('/:orgId/hook-skip', requireApiKey, validate(hookSkipSchema), async (req, res) => {
+  const boundMember = req.apiKeyRecord?.member;
   await writeAuditLog({
     orgId: req.org!.id,
+    actorId: boundMember?.userId,
     action: 'hook.bypassed',
-    metadata: { repo: req.body.repo, actor: req.body.actor }
+    metadata: { repo: req.body.repo, actor: boundMember?.user.email ?? req.body.actor }
   });
   res.status(204).send();
 });

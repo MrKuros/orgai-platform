@@ -9,7 +9,9 @@
 # Config (env or git config orgai.*):
 #   COMPLY_API_URL   OrgAI server, default http://localhost:8080
 #   COMPLY_API_KEY   org API key (required)
-#   COMPLY_ROLE      role to check as, default junior
+#   COMPLY_ROLE      role to check as. Optional for developer-bound keys —
+#                    the server uses the developer's assigned roles. Required
+#                    for org-wide keys (the server rejects role-less checks).
 #   COMPLY_SKIP=1    bypass this hook once (or git commit --no-verify)
 #
 # CI mode: pre-commit <base-ref> <head-ref>  checks the diff between two refs.
@@ -17,8 +19,10 @@
 API_URL="${COMPLY_API_URL:-$(git config orgai.apiurl || true)}"
 API_URL="${API_URL:-http://localhost:8080}"
 API_KEY="${COMPLY_API_KEY:-$(git config orgai.apikey || true)}"
+# No default role: an empty ROLE omits roleName from the request, which is
+# correct for developer-bound keys (server resolves the developer's roles)
+# and fails loud for org-wide keys instead of silently checking as junior.
 ROLE="${COMPLY_ROLE:-$(git config orgai.role || true)}"
-ROLE="${ROLE:-junior}"
 
 # Bypass is allowed but recorded: fire-and-forget audit ping, then exit clean.
 if [ "$COMPLY_SKIP" = "1" ]; then
@@ -85,8 +89,10 @@ printf '%s\n' "$FILES" | while IFS= read -r f; do
   # numstat starts with a digit (added-line count) for text, "-" for binary.
   case "$NUMSTAT" in -*) continue ;; esac
 
-  BODY=$(printf '%s' "$CONTENT" | python3 -c 'import json,sys; print(json.dumps({"type":"code","content":sys.stdin.read(),"roleName":sys.argv[1],"filePath":sys.argv[2]}))' "$ROLE" "$f" 2>/dev/null) \
-    || BODY=$(printf '%s' "$CONTENT" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.stringify({type:"code",content:s,roleName:process.argv[1],filePath:process.argv[2]})))' "$ROLE" "$f")
+  BODY=$(printf '%s' "$CONTENT" | python3 -c 'import json,sys; b={"type":"code","content":sys.stdin.read(),"filePath":sys.argv[2]};
+if sys.argv[1]: b["roleName"]=sys.argv[1]
+print(json.dumps(b))' "$ROLE" "$f" 2>/dev/null) \
+    || BODY=$(printf '%s' "$CONTENT" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const b={type:"code",content:s,filePath:process.argv[2]};if(process.argv[1])b.roleName=process.argv[1];console.log(JSON.stringify(b))})' "$ROLE" "$f")
 
   RESP=$(printf '%s' "$BODY" | curl -sS --max-time 10 -X POST "$API_URL/v1/orgs/_/check" \
     -H "x-api-key: $API_KEY" -H "Content-Type: application/json" -d @-)

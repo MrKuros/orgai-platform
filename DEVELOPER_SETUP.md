@@ -14,6 +14,10 @@ curl -fsSL https://<orgai-host>/setup.sh | bash -s -- --key oai_... --url https:
 In two teams? Comma-separate the roles — policies from both apply:
 `--role "payments-dev,ml-dev"`
 
+**Got a developer-bound key** (your admin issued it to you in the dashboard)?
+Skip `--role` entirely — the server already knows your roles and every check
+you run is attributed to you in the audit trail.
+
 That's it — it auto-configures every AI agent it detects on your machine
 (Claude Code, Cursor, Windsurf, OpenCode, Antigravity, and VS Code / Copilot
 agent mode via `.vscode/mcp.json`) *and* installs the git pre-commit hook with

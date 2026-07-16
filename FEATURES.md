@@ -28,6 +28,10 @@ enforced across every agent your team runs — with the audit trail to prove it.
   loop: checks are deterministic, millisecond-fast, zero per-check token cost.
 - **Role-scoped resolution** — every check evaluates against the requesting
   developer's resolved role and its inherited policy set.
+- **Starter policy packs** — importable rule sets for HIPAA, PCI DSS, DPDP
+  (India), and baseline security hygiene. Packs import in shadow mode by
+  default and skip name collisions; bind to roles at import or later.
+  Community packs are plain-JSON PRs against `api/src/policy-packs/`.
 
 ## Role hierarchy & policy cascade
 
@@ -88,6 +92,14 @@ enforced across every agent your team runs — with the audit trail to prove it.
   hardened path. Unconfigured email falls back to logging, nothing breaks.
 - **API keys** — per-org, hashed at rest, shown once, revocable, rate-limited;
   key auth is org-pinned (no cross-tenant reach).
+- **Per-developer keys** — bind a key to a team member: every check runs as
+  that developer's assigned roles automatically (no `--role` flag, and a
+  client-supplied role can never select a weaker policy set) and the audit
+  trail names them — checks, violations, and hook bypasses are attributed to
+  a person, not "System / Agent". Removing the member removes their keys.
+- **Member deactivation** — deactivate instead of delete: history stays, but
+  dashboard access and all member-bound keys stop working immediately.
+  Reactivate any time. Self- and last-admin-deactivation blocked (409).
 
 ## Dashboard
 

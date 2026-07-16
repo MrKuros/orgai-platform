@@ -154,6 +154,18 @@ export default function TeamPage() {
     setNewAssignedRoleIds((member.assignedRoles || []).map((r: any) => r.id));
   };
 
+  const handleToggleActive = async (member: any) => {
+    if (!currentOrg) return;
+    const deactivating = member.active !== false;
+    try {
+      await updateMember(currentOrg.id, member.userId, { active: !deactivating });
+      mutateMembers();
+      toast({ title: deactivating ? 'Member deactivated — their access and bound API keys stop working' : 'Member reactivated' });
+    } catch (error) {
+      toast({ title: 'Error updating member', description: error instanceof ApiError ? error.message : 'Unknown error', variant: 'destructive' });
+    }
+  };
+
   return (
     <AppLayout>
       <div className="container mx-auto p-6 max-w-5xl">
@@ -200,6 +212,7 @@ export default function TeamPage() {
                                 {displayName}
                                 {isSelf && <span className="bg-primary/10 text-primary text-[10px] px-1.5 py-0.5 rounded-sm uppercase font-bold tracking-wider">You</span>}
                                 {member.pending && <Badge variant="outline" className="text-[10px] text-amber-600 dark:text-amber-400 border-amber-500/40 bg-amber-500/10">Pending</Badge>}
+                                {member.active === false && <Badge variant="outline" className="text-[10px] text-muted-foreground border-muted-foreground/40">Deactivated</Badge>}
                               </div>
                               <div className="text-muted-foreground text-xs">{email}</div>
                             </div>
@@ -240,8 +253,14 @@ export default function TeamPage() {
                                   Copy invite link
                                 </DropdownMenuItem>
                               )}
+                              <DropdownMenuItem
+                                disabled={isSelf}
+                                onClick={() => handleToggleActive(member)}
+                              >
+                                {member.active === false ? 'Reactivate' : 'Deactivate'}
+                              </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem 
+                              <DropdownMenuItem
                                 className="text-destructive focus:bg-destructive/10 focus:text-destructive"
                                 disabled={isSelf} // Can't delete yourself
                                 onClick={() => setMemberToDelete(member.userId)}

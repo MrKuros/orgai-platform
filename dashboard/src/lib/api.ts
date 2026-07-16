@@ -4,7 +4,8 @@ import {
   Policy, CreatePolicyInput, UpdatePolicyInput,
   Membership, InviteMemberInput, UpdateMemberInput,
   ApiKey, CreateApiKeyInput, AuditLogEntry,
-  SsoConfig, PolicyVersion, OrgStats, TestPolicyResult
+  SsoConfig, PolicyVersion, OrgStats, TestPolicyResult,
+  PolicyPack
 } from './types';
 
 // ?? not ||: empty string means same-origin (self-host proxy via next.config rewrites)
@@ -183,6 +184,15 @@ export async function createApiKey(orgId: string, data: CreateApiKeyInput): Prom
 
 export async function deleteApiKey(orgId: string, keyId: string): Promise<void> {
   return fetchApi<void>(`/orgs/${orgId}/api-keys/${keyId}`, { method: 'DELETE' });
+}
+
+// Policy Packs
+export async function getPolicyPacks(): Promise<{ packs: PolicyPack[] }> {
+  return fetchApi<{ packs: PolicyPack[] }>(`/policy-packs`);
+}
+
+export async function importPolicyPack(orgId: string, data: { packId: string; roleIds?: string[]; status?: 'ENFORCED' | 'SHADOW' }): Promise<{ imported: string[]; skipped: string[]; status: string }> {
+  return fetchApi<{ imported: string[]; skipped: string[]; status: string }>(`/orgs/${orgId}/policies/import-pack`, { method: 'POST', body: JSON.stringify(data) });
 }
 
 // Audit Log

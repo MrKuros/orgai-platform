@@ -1,0 +1,57 @@
+{
+  "id": "baseline-security",
+  "name": "Baseline Security",
+  "description": "Credential hygiene and dangerous-pattern rules every org should run: hardcoded secrets, credential-bearing URLs, private key material, disabled TLS verification, eval.",
+  "policies": [
+    {
+      "name": "no-hardcoded-credentials",
+      "rule": "Never hardcode passwords, secrets, API keys, or tokens as string literals. Load them from environment variables or a secrets manager.",
+      "skill": "When code needs a credential, read it from process.env / os.environ or the org's secrets manager. Never write the literal value, even as a placeholder that looks real.",
+      "evaluatorType": "regex",
+      "evaluatorPattern": "(?:password|passwd|secret|api[_-]?key|auth[_-]?token)\\s*[:=]\\s*['\"][^'\"]{8,}['\"]",
+      "evaluatorFlags": "i",
+      "fixSuggestion": "Move the value to an environment variable or secrets manager and reference it by name.",
+      "severity": "ERROR"
+    },
+    {
+      "name": "no-credentials-in-urls",
+      "rule": "Connection strings and URLs must not embed username:password credentials.",
+      "skill": "Build connection strings from environment variables. Never inline user:pass@host in any scheme (postgres://, mongodb://, https://, redis://).",
+      "evaluatorType": "regex",
+      "evaluatorPattern": "[a-z][a-z0-9+.-]*:\\/\\/[^\\/\\s:@'\"]+:[^\\/\\s:@'\"]+@",
+      "evaluatorFlags": "",
+      "fixSuggestion": "Use a credential-free URL and supply auth via environment variables or a connection config object.",
+      "severity": "ERROR"
+    },
+    {
+      "name": "no-private-key-material",
+      "rule": "Private key material must never appear in source code.",
+      "skill": "Keys live in a secrets manager or key file outside the repo. If a test needs one, generate it at test runtime.",
+      "evaluatorType": "regex",
+      "evaluatorPattern": "-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY",
+      "evaluatorFlags": "",
+      "fixSuggestion": "Remove the key, rotate it (it is now compromised), and load keys from outside the repository.",
+      "severity": "ERROR"
+    },
+    {
+      "name": "no-disabled-tls-verification",
+      "rule": "TLS certificate verification must not be disabled.",
+      "skill": "If a connection fails TLS verification, fix the certificate chain (add the CA bundle) instead of turning verification off.",
+      "evaluatorType": "regex",
+      "evaluatorPattern": "rejectUnauthorized\\s*:\\s*false|InsecureSkipVerify\\s*:\\s*true|verify\\s*=\\s*False|CURLOPT_SSL_VERIFYPEER[^\\n]*0",
+      "evaluatorFlags": "",
+      "fixSuggestion": "Re-enable verification and configure the proper CA certificate instead.",
+      "severity": "ERROR"
+    },
+    {
+      "name": "no-eval",
+      "rule": "Do not use eval() or equivalent dynamic code execution on strings.",
+      "skill": "Parse data with JSON.parse or a real parser. Map dynamic behavior through a lookup table of functions instead of evaluating strings.",
+      "evaluatorType": "regex",
+      "evaluatorPattern": "\\beval\\s*\\(",
+      "evaluatorFlags": "",
+      "fixSuggestion": "Replace eval with JSON.parse, a parser, or a function lookup table.",
+      "severity": "WARNING"
+    }
+  ]
+}

@@ -87,6 +87,9 @@ model Membership {
   orgId          String
   userId         String
   role           MembershipRole   @default(MEMBER)
+  // Deactivated members keep their history but lose all access: dashboard
+  // org access and any member-bound API keys stop working.
+  active         Boolean          @default(true)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
@@ -95,6 +98,7 @@ model Membership {
   // A member can sit under multiple superiors (matrix orgs) — checks resolve
   // the union of every assigned role's inheritance chain.
   assignedRoles  Role[]           @relation("MembershipAssignedRoles")
+  apiKeys        ApiKey[]
 
   @@unique([orgId, userId])
 }
@@ -193,6 +197,10 @@ model ApiKey {
   id          String       @id @default(uuid())
   orgId       String
   createdById String
+  // Optional developer binding. A member-bound key always checks as that
+  // member's assigned roles (roleName in requests is ignored) and audit rows
+  // are attributed to them. Removing the member removes their keys.
+  memberId    String?
   name        String
   keyHash     String       @unique
   keyPrefix   String
@@ -203,6 +211,7 @@ model ApiKey {
 
   org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   createdBy   User         @relation(fields: [createdById], references: [id])
+  member      Membership?  @relation(fields: [memberId], references: [id], onDelete: Cascade)
 }
 
 model AuditLog {

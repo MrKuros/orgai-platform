@@ -1,0 +1,47 @@
+{
+  "id": "hipaa",
+  "name": "HIPAA Safeguards (US health data)",
+  "description": "Deterministic guards for codebases touching PHI: SSN literals, PHI in log statements, PHI in URLs/query strings, plaintext transport. Supports §164.312 technical-safeguard evidence — evidence, not certification.",
+  "policies": [
+    {
+      "name": "no-ssn-literals",
+      "rule": "Social Security Numbers must never appear as literals in source code, fixtures, or comments.",
+      "skill": "Use obviously-fake placeholders (000-00-0000 fails validation everywhere) or generated fixtures. Real SSNs in code are a reportable disclosure.",
+      "evaluatorType": "regex",
+      "evaluatorPattern": "\\b(?!000|666|9\\d{2})\\d{3}-\\d{2}-\\d{4}\\b",
+      "evaluatorFlags": "",
+      "fixSuggestion": "Remove the SSN and use a generated or clearly-invalid placeholder.",
+      "severity": "ERROR"
+    },
+    {
+      "name": "no-phi-in-logs",
+      "rule": "Patient identifiers (SSN, MRN, DOB, diagnosis) must not be written to logs.",
+      "skill": "Log opaque record IDs, never the PHI fields themselves. If debugging needs patient context, log the internal UUID and look the record up in the system of record.",
+      "evaluatorType": "regex",
+      "evaluatorPattern": "(?:console\\.(?:log|info|debug|warn)|logger\\.(?:info|debug|log|warn)|print)\\s*\\([^)]*(?:patient|ssn|diagnosis|medical_?record|mrn\\b|date_?of_?birth|dob\\b)",
+      "evaluatorFlags": "i",
+      "fixSuggestion": "Log the internal record UUID instead of patient-identifying fields.",
+      "severity": "ERROR"
+    },
+    {
+      "name": "no-phi-in-urls",
+      "rule": "PHI must not be passed in URLs or query strings — URLs land in access logs, browser history, and proxies.",
+      "skill": "Send PHI in the request body over HTTPS. Use opaque identifiers in paths (/patients/{uuid}), never ?ssn= or ?dob=.",
+      "evaluatorType": "regex",
+      "evaluatorPattern": "[?&](?:ssn|dob|mrn|patient_?id|diagnosis)=",
+      "evaluatorFlags": "i",
+      "fixSuggestion": "Move the identifier to the request body or use an opaque UUID path parameter.",
+      "severity": "ERROR"
+    },
+    {
+      "name": "require-https-endpoints",
+      "rule": "Service endpoints must use HTTPS — PHI in transit must be encrypted.",
+      "skill": "Default every endpoint constant and config to https://. http:// is acceptable only for localhost development.",
+      "evaluatorType": "regex",
+      "evaluatorPattern": "['\"]http:\\/\\/(?!localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0)",
+      "evaluatorFlags": "",
+      "fixSuggestion": "Change the endpoint to https:// (http is only acceptable for localhost).",
+      "severity": "WARNING"
+    }
+  ]
+}

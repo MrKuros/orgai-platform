@@ -4,12 +4,15 @@ set -euo pipefail
 # OrgAI developer setup — configures your AI agents (MCP) and installs the git
 # pre-commit hook. Run from inside a git repo to get the hook too.
 #   curl -fsSL https://<orgai-host>/setup.sh | bash -s -- --key oai_...
-# Flags: --key <org api key> (required) · --url <orgai host> · --role <role, default junior>
+# Flags: --key <api key> (required) · --url <orgai host> · --role <role>
+# --role is optional when your key is developer-bound (issued to you in the
+# dashboard): the server then checks as YOUR assigned roles automatically.
+# Org-wide keys still require --role.
 
 # Parse args
 API_KEY=""
 API_URL="https://api.orgai.dev"
-ROLE="junior"
+ROLE=""
 while [[ $# -gt 0 ]]; do
   case $1 in
     --key) API_KEY="$2"; shift 2 ;;
@@ -133,8 +136,13 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
     chmod +x "$HOOK_DIR/pre-commit"
     git config orgai.apiurl "$API_URL"
     git config orgai.apikey "$API_KEY"
-    git config orgai.role "$ROLE"
-    HOOK_MSG="🪝 pre-commit hook installed in this repo (role: $ROLE)"
+    if [ -n "$ROLE" ]; then
+      git config orgai.role "$ROLE"
+      HOOK_MSG="🪝 pre-commit hook installed in this repo (role: $ROLE)"
+    else
+      git config --unset orgai.role 2>/dev/null || true
+      HOOK_MSG="🪝 pre-commit hook installed in this repo (role: from your developer-bound key)"
+    fi
   else
     HOOK_MSG="⚠️  Could not download the pre-commit hook from $API_URL/hook/pre-commit"
   fi

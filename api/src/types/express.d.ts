@@ -1,4 +1,4 @@
-import { User, Organization, ApiKey, Membership } from '@prisma/client';
+import { User, Organization, ApiKey, Membership, Role } from '@prisma/client';
 
 declare global {
   namespace Express {
@@ -6,7 +6,10 @@ declare global {
       user?: User;
       org?: Organization;
       membership?: Membership;
-      apiKeyRecord?: ApiKey;
+      // member is populated for member-bound keys (developer identity + roles)
+      apiKeyRecord?: ApiKey & {
+        member?: (Membership & { user: User; assignedRoles: Role[] }) | null;
+      };
     }
   }
 }

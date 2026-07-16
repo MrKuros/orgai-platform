@@ -6,6 +6,7 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, requireOrgRole } from '../middleware/auth';
 import { writeAuditLog } from '../services/audit';
 import { assertWithinLimit, limitsFor } from '../lib/plans';
+import { AppError } from '../lib/AppError';
 
 export const apiKeysRouter = Router();
 
@@ -38,7 +39,9 @@ apiKeysRouter.get('/:orgId/api-keys', requireAuth, requireOrgRole('ORG_ADMIN'), 
       scopes: true,
       lastUsedAt: true,
       expiresAt: true,
-      createdAt: true
+      createdAt: true,
+      memberId: true,
+      member: { select: { user: { select: { email: true, firstName: true, lastName: true } } } }
     }
   });
   res.json({ apiKeys: keys });
@@ -47,7 +50,10 @@ apiKeysRouter.get('/:orgId/api-keys', requireAuth, requireOrgRole('ORG_ADMIN'), 
 const createKeySchema = z.object({
   name: z.string().min(1),
   scopes: z.array(z.string()).default([]),
-  expiresAt: z.string().datetime().optional()
+  expiresAt: z.string().datetime().optional(),
+  // Bind the key to a developer: checks run as their assigned roles and the
+  // audit trail names them. Omit for an org-wide (CI / service) key.
+  memberId: z.string().min(1).optional()
 });
 
 /**
@@ -97,7 +103,19 @@ const createKeySchema = z.object({
  *                   description: The raw API key (only shown once)
  */
 apiKeysRouter.post('/:orgId/api-keys', requireAuth, requireOrgRole('ORG_ADMIN'), validate(createKeySchema), async (req, res) => {
-  const { name, scopes, expiresAt } = req.body;
+  const { name, scopes, expiresAt, memberId } = req.body;
+
+  if (memberId) {
+    const member = await prisma.membership.findFirst({
+      where: { id: memberId, orgId: req.org!.id }
+    });
+    if (!member) {
+      throw new AppError(400, 'ERROR', 'memberId does not belong to this organization');
+    }
+    if (!member.active) {
+      throw new AppError(400, 'ERROR', 'Cannot issue a key for a deactivated member');
+    }
+  }
 
   const keyCount = await prisma.apiKey.count({ where: { orgId: req.org!.id } });
   assertWithinLimit(keyCount, limitsFor(req.org!.plan).apiKeys, 'API key', req.org!.plan);
@@ -110,6 +128,7 @@ apiKeysRouter.post('/:orgId/api-keys', requireAuth, requireOrgRole('ORG_ADMIN'),
     data: {
       orgId: req.org!.id,
       createdById: req.user!.id,
+      memberId: memberId || null,
       name,
       keyHash,
       keyPrefix,
@@ -123,7 +142,7 @@ apiKeysRouter.post('/:orgId/api-keys', requireAuth, requireOrgRole('ORG_ADMIN'),
     actorId: req.user!.id,
     action: 'apikey.created',
     resource: apiKey.id,
-    metadata: { name }
+    metadata: { name, ...(memberId ? { memberId } : {}) }
   });
 
   res.status(201).json({
@@ -132,6 +151,7 @@ apiKeysRouter.post('/:orgId/api-keys', requireAuth, requireOrgRole('ORG_ADMIN'),
       name: apiKey.name,
       keyPrefix: apiKey.keyPrefix,
       scopes: apiKey.scopes,
+      memberId: apiKey.memberId,
       expiresAt: apiKey.expiresAt,
       createdAt: apiKey.createdAt
     },

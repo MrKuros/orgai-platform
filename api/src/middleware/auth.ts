@@ -39,7 +39,11 @@ export async function requireApiKey(req: Request, res: Response, next: NextFunct
     
     const apiKeyRecord = await prisma.apiKey.findUnique({
       where: { keyHash },
-      include: { org: true }
+      include: {
+        org: true,
+        // Member-bound keys carry the developer's identity and assigned roles.
+        member: { include: { user: true, assignedRoles: true } }
+      }
     });
 
     if (!apiKeyRecord) {
@@ -48,6 +52,11 @@ export async function requireApiKey(req: Request, res: Response, next: NextFunct
 
     if (apiKeyRecord.expiresAt && apiKeyRecord.expiresAt < new Date()) {
       throw new AppError(401, 'ERROR', 'Unauthorized: API key expired');
+    }
+
+    // A deactivated member's keys stop working immediately.
+    if (apiKeyRecord.member && !apiKeyRecord.member.active) {
+      throw new AppError(401, 'ERROR', 'Unauthorized: member is deactivated');
     }
 
     // Fire and forget updating lastUsedAt
@@ -93,7 +102,7 @@ export async function requireOrgAccess(req: Request, res: Response, next: NextFu
       include: { org: true }
     });
 
-    if (!membership) {
+    if (!membership || !membership.active) {
       throw new AppError(403, 'ERROR', 'Forbidden: Not a member of this organization');
     }
 
@@ -131,7 +140,7 @@ export function requireOrgRole(...roles: MembershipRole[]) {
         include: { org: true }
       });
 
-      if (!membership) {
+      if (!membership || !membership.active) {
         throw new AppError(403, 'ERROR', 'Forbidden: Not a member of this organization');
       }
 

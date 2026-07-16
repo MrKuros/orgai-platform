@@ -1,0 +1,47 @@
+{
+  "id": "dpdp",
+  "name": "DPDP (India personal data)",
+  "description": "Guards for Indian personal data under the Digital Personal Data Protection Act: Aadhaar and PAN literals, personal data in logs and URLs. Evidence for DPDP diligence — evidence, not certification.",
+  "policies": [
+    {
+      "name": "no-aadhaar-literals",
+      "rule": "Aadhaar numbers must never appear as literals in source code or fixtures.",
+      "skill": "Use clearly-invalid placeholders (Aadhaar never starts with 0 or 1 — use 1111 1111 1111 in fixtures) or generated fakes.",
+      "evaluatorType": "regex",
+      "evaluatorPattern": "\\b[2-9][0-9]{3}\\s[0-9]{4}\\s[0-9]{4}\\b",
+      "evaluatorFlags": "",
+      "fixSuggestion": "Remove the Aadhaar number; use a clearly-invalid placeholder starting with 0 or 1.",
+      "severity": "WARNING"
+    },
+    {
+      "name": "no-pan-card-literals",
+      "rule": "Indian PAN (tax) numbers must never appear as literals in source code or fixtures.",
+      "skill": "PAN format is AAAAA9999A. Use an invalid placeholder like AAAAA0000A in tests.",
+      "evaluatorType": "regex",
+      "evaluatorPattern": "\\b[A-Z]{3}[ABCFGHLJPT][A-Z][0-9]{4}[A-Z]\\b",
+      "evaluatorFlags": "",
+      "fixSuggestion": "Replace with an invalid-format placeholder PAN.",
+      "severity": "WARNING"
+    },
+    {
+      "name": "no-personal-data-in-logs",
+      "rule": "Personal identifiers (Aadhaar, PAN, phone, email, address) must not be written to logs.",
+      "skill": "Log opaque user IDs. Personal data in logs creates an uncontrolled copy the DPDP fiduciary duties still apply to.",
+      "evaluatorType": "regex",
+      "evaluatorPattern": "(?:console\\.(?:log|info|debug|warn)|logger\\.(?:info|debug|log|warn)|print)\\s*\\([^)]*(?:aadhaar|pan_?number|phone_?number|\\bemail\\b|home_?address)",
+      "evaluatorFlags": "i",
+      "fixSuggestion": "Log the internal user UUID instead of personal identifiers.",
+      "severity": "ERROR"
+    },
+    {
+      "name": "no-pii-in-urls",
+      "rule": "Personal identifiers must not be passed in URLs or query strings.",
+      "skill": "Send personal data in request bodies over HTTPS; use opaque identifiers in paths.",
+      "evaluatorType": "regex",
+      "evaluatorPattern": "[?&](?:aadhaar|pan|phone|email|address)=",
+      "evaluatorFlags": "i",
+      "fixSuggestion": "Move the identifier to the request body or use an opaque UUID path parameter.",
+      "severity": "ERROR"
+    }
+  ]
+}

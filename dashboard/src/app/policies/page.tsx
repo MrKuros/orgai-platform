@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
 import useSWR from 'swr';
-import { Plus, Trash2, Pencil, Shield, ArrowRight, ShieldCheck, Search, Play, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Pencil, Shield, ArrowRight, ShieldCheck, Search, Play, AlertTriangle, PackageOpen } from 'lucide-react';
 
 import { useAuth, useRole } from '@/lib/auth';
 import { fetcher, createPolicy, updatePolicy, deletePolicy, ApiError } from '@/lib/api';
@@ -19,6 +19,7 @@ import { PolicyForm, PolicyFormValues } from '@/components/policy-form';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { LiveEvaluatorPreview } from '@/components/live-evaluator-preview';
+import { ImportPackDialog } from '@/components/import-pack-dialog';
 
 export default function PoliciesPage() {
   const { currentOrg } = useAuth();
@@ -47,6 +48,9 @@ export default function PoliciesPage() {
 
   // Live Evaluator Preview
   const [isEvaluatorOpen, setIsEvaluatorOpen] = useState(false);
+
+  // Import pack dialog
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   const filteredPolicies = policies.filter((p: any) => 
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -110,9 +114,14 @@ export default function PoliciesPage() {
                 <Play className="w-4 h-4 mr-2" /> Evaluate
               </Button>
               {canManagePolicies && (
-                <Button onClick={() => setIsCreateOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2" /> New Policy
-                </Button>
+                <>
+                  <Button variant="outline" onClick={() => setIsImportOpen(true)}>
+                    <PackageOpen className="w-4 h-4 mr-2" /> Import Pack
+                  </Button>
+                  <Button onClick={() => setIsCreateOpen(true)}>
+                    <Plus className="w-4 h-4 mr-2" /> New Policy
+                  </Button>
+                </>
               )}
             </div>
           }
@@ -289,6 +298,14 @@ export default function PoliciesPage() {
       <LiveEvaluatorPreview
         open={isEvaluatorOpen}
         onOpenChange={setIsEvaluatorOpen}
+      />
+
+      {/* Import Policy Pack */}
+      <ImportPackDialog
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        roles={roles}
+        onImported={() => mutatePolicies()}
       />
     </AppLayout>
   );

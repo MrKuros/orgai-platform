@@ -20,6 +20,7 @@ import { CopyButton } from '@/components/copy-button';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type CreatePreset = 'vscode' | 'mcp' | null;
 
@@ -58,6 +59,13 @@ export default function ApiKeysPage() {
 
   const apiKeys = data?.apiKeys || [];
 
+  // Members for the optional developer binding on new keys.
+  const { data: membersData } = useSWR<any>(
+    currentOrg ? `/orgs/${currentOrg.id}/members` : null,
+    fetcher
+  );
+  const activeMembers = (membersData?.members || []).filter((m: any) => m.active !== false);
+
   // Tab state
   const [activeTab, setActiveTab] = useState<'vscode' | 'mcp'>('vscode');
 
@@ -66,6 +74,7 @@ export default function ApiKeysPage() {
   const [createPreset, setCreatePreset] = useState<CreatePreset>(null);
   const [newKeyName, setNewKeyName] = useState('');
   const [newKeyScopes, setNewKeyScopes] = useState<string[]>(['check', 'resolve']);
+  const [newKeyMemberId, setNewKeyMemberId] = useState<string>('');
   const [isCreating, setIsCreating] = useState(false);
   const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null);
 
@@ -117,11 +126,13 @@ export default function ApiKeysPage() {
       const res = await createApiKey(currentOrg.id, {
         name: newKeyName.trim(),
         scopes: newKeyScopes,
+        ...(newKeyMemberId ? { memberId: newKeyMemberId } : {}),
       });
       mutate();
       setNewlyCreatedKey(res.key);
       setNewKeyName('');
       setNewKeyScopes(['check', 'resolve']);
+      setNewKeyMemberId('');
       setIsCreateOpen(false);
     } catch (error) {
       toast({
@@ -219,6 +230,7 @@ export default function ApiKeysPage() {
                 <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b">
                   <tr>
                     <th className="px-6 py-4 font-medium">Name</th>
+                    <th className="px-6 py-4 font-medium">Developer</th>
                     <th className="px-6 py-4 font-medium">Key Prefix</th>
                     <th className="px-6 py-4 font-medium">Scopes</th>
                     <th className="px-6 py-4 font-medium">Last Used</th>
@@ -234,6 +246,13 @@ export default function ApiKeysPage() {
                           <Key className="h-4 w-4 text-muted-foreground" />
                           <span className="font-medium">{key.name}</span>
                         </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {key.member ? (
+                          <span className="text-xs">{key.member.user.email}</span>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px]">Org-wide</Badge>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <code className="bg-muted px-2 py-0.5 rounded text-xs font-mono">{key.keyPrefix}...</code>
@@ -415,6 +434,25 @@ export default function ApiKeysPage() {
                 disabled={isCreating}
                 required
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Developer (optional)</Label>
+              <Select value={newKeyMemberId || 'org-wide'} onValueChange={(v) => setNewKeyMemberId(v === 'org-wide' ? '' : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Org-wide key" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="org-wide">Org-wide (CI / service key)</SelectItem>
+                  {activeMembers.map((m: any) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.user?.email || m.id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                A developer-bound key always checks as that developer&apos;s assigned roles and the audit trail names them — no --role flag needed.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Scopes</Label>

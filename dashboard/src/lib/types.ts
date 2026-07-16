@@ -28,6 +28,7 @@ export interface Membership {
   orgId: string;
   userId: string;
   role: MembershipRole;
+  active: boolean;
   createdAt: string;
   updatedAt: string;
   org: Organization;
@@ -83,6 +84,8 @@ export interface ApiKey {
   lastUsedAt: string | null;
   expiresAt: string | null;
   createdAt: string;
+  memberId?: string | null;
+  member?: { user: { email: string; firstName?: string; lastName?: string } } | null;
 }
 
 export interface AuditLogEntry {
@@ -151,12 +154,22 @@ export interface UpdateMemberInput {
   membershipRole?: MembershipRole;
   assignedRoleId?: string | null; // legacy single-role
   assignedRoleIds?: string[];
+  active?: boolean;
 }
 
 export interface CreateApiKeyInput {
   name: string;
   scopes?: string[];
   expiresAt?: string;
+  // bind the key to a developer: checks run as their assigned roles
+  memberId?: string;
+}
+
+export interface PolicyPack {
+  id: string;
+  name: string;
+  description: string;
+  policies: { name: string; rule: string; severity: PolicySeverity }[];
 }
 
 export interface OrgStats {

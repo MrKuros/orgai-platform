@@ -1,0 +1,47 @@
+{
+  "id": "pci-dss",
+  "name": "PCI DSS (payment card data)",
+  "description": "Guards for codebases near cardholder data: PAN literals, CVV storage, card data in logs, magstripe track data. Supports PCI DSS requirement 3/4 evidence — evidence, not certification.",
+  "policies": [
+    {
+      "name": "no-card-number-literals",
+      "rule": "Payment card numbers (PANs) must never appear as literals in source code or fixtures.",
+      "skill": "Use the official test PANs from your payment provider's sandbox docs (e.g. Stripe's 4242... tokens) — never a number that could be real.",
+      "evaluatorType": "regex",
+      "evaluatorPattern": "\\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13})\\b",
+      "evaluatorFlags": "",
+      "fixSuggestion": "Replace with your payment provider's documented sandbox test card numbers.",
+      "severity": "ERROR"
+    },
+    {
+      "name": "no-cvv-storage",
+      "rule": "CVV/CVC must never be stored — assignment or persistence of card verification values is prohibited (PCI DSS 3.2).",
+      "skill": "CVV may only transit directly to the payment processor. Never assign it to a model field, database column, cache, or log.",
+      "evaluatorType": "regex",
+      "evaluatorPattern": "\\b(?:cvv2?|cvc|card_?verification)\\b\\s*[:=]",
+      "evaluatorFlags": "i",
+      "fixSuggestion": "Pass CVV straight to the processor SDK call; never store or assign it.",
+      "severity": "ERROR"
+    },
+    {
+      "name": "no-card-data-in-logs",
+      "rule": "Card numbers and cardholder data must not be written to logs.",
+      "skill": "Log the processor's token or the last4 field your provider returns — never the PAN, expiry, or cardholder name together.",
+      "evaluatorType": "regex",
+      "evaluatorPattern": "(?:console\\.(?:log|info|debug|warn)|logger\\.(?:info|debug|log|warn)|print)\\s*\\([^)]*(?:card_?number|\\bpan\\b|credit_?card|cardholder)",
+      "evaluatorFlags": "i",
+      "fixSuggestion": "Log the payment token or last4 instead of raw card data.",
+      "severity": "ERROR"
+    },
+    {
+      "name": "no-track-data",
+      "rule": "Magnetic stripe track data must never be handled or stored in application code.",
+      "skill": "Track data belongs exclusively to the payment terminal and processor. Application code referencing track1/track2 is a design problem — raise it.",
+      "evaluatorType": "regex",
+      "evaluatorPattern": "\\b(?:track1|track2|magstripe)\\b",
+      "evaluatorFlags": "i",
+      "fixSuggestion": "Remove track-data handling; only the payment terminal/processor may touch it.",
+      "severity": "WARNING"
+    }
+  ]
+}
