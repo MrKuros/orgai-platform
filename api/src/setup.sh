@@ -141,7 +141,7 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
       HOOK_MSG="🪝 pre-commit hook installed in this repo (role: $ROLE)"
     else
       git config --unset orgai.role 2>/dev/null || true
-      HOOK_MSG="🪝 pre-commit hook installed in this repo (role: from your developer-bound key)"
+      HOOK_MSG="🪝 pre-commit hook installed (no role set — fine for developer-bound keys; org-wide keys must rerun with --role or commits will be blocked)"
     fi
   else
     HOOK_MSG="⚠️  Could not download the pre-commit hook from $API_URL/hook/pre-commit"

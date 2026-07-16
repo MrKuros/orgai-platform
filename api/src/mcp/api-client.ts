@@ -55,7 +55,9 @@ export class OrgAIClient {
     return this.request(`/v1/orgs/${orgId}/resolve/${roleName}`);
   }
 
-  async check(orgId: string, params: { type: 'code' | 'command', content: string, filePath?: string, roleName: string }) {
+  // roleName optional: member-bound keys resolve the developer's roles
+  // server-side; org-wide keys get a clear 400 without it.
+  async check(orgId: string, params: { type: 'code' | 'command', content: string, filePath?: string, roleName?: string }) {
     return this.request(`/v1/orgs/${orgId}/check`, {
       method: 'POST',
       body: JSON.stringify(params),

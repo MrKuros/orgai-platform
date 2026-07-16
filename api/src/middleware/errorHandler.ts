@@ -31,6 +31,15 @@ export function errorHandler(
     return;
   }
 
+  // Prisma "record not found" on update/delete — a missing resource is a 404,
+  // not a 500 (e.g. PATCH a member that was removed mid-flight).
+  if ((err as any)?.code === 'P2025') {
+    res.status(404).json({
+      error: { code: 'NOT_FOUND', message: 'Resource not found' },
+    });
+    return;
+  }
+
   logger.error(err.message, { stack: err.stack });
   res.status(500).json({
     error: {

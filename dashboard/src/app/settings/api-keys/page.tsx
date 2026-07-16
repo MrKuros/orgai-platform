@@ -94,18 +94,18 @@ export default function ApiKeysPage() {
   }
 }`;
 
-  // Open create dialog with preset
+  // Open create dialog with preset — reset ALL fields (a member binding left
+  // over from a cancelled dialog must not silently attach to the next key).
   const openCreateDialog = (preset: CreatePreset) => {
     if (preset === 'vscode') {
       setNewKeyName('VS Code Extension');
-      setNewKeyScopes(['check', 'resolve']);
     } else if (preset === 'mcp') {
       setNewKeyName('MCP Agent');
-      setNewKeyScopes(['check', 'resolve']);
     } else {
       setNewKeyName('');
-      setNewKeyScopes(['check', 'resolve']);
     }
+    setNewKeyScopes(['check', 'resolve']);
+    setNewKeyMemberId('');
     setCreatePreset(preset);
     setIsCreateOpen(true);
   };
@@ -204,9 +204,11 @@ export default function ApiKeysPage() {
         {error ? (
           <EmptyState
             icon={<AlertTriangle className="w-10 h-10 text-destructive" />}
-            title="Couldn't load API keys"
-            description="Something went wrong fetching your API keys. Check your connection and try again."
-            action={<Button onClick={() => mutate()}>Retry</Button>}
+            title={error?.status === 403 ? 'Admin access required' : "Couldn't load API keys"}
+            description={error?.status === 403
+              ? 'Only organization admins can view and manage API keys. Ask your ORG_ADMIN for a key.'
+              : 'Something went wrong fetching your API keys. Check your connection and try again.'}
+            action={error?.status === 403 ? undefined : <Button onClick={() => mutate()}>Retry</Button>}
           />
         ) : isLoading ? (
           <div className="flex justify-center p-12"><Spinner className="w-8 h-8" /></div>

@@ -88,6 +88,10 @@ const createKeySchema = z.object({
  *               expiresAt:
  *                 type: string
  *                 format: date-time
+ *               memberId:
+ *                 type: string
+ *                 format: uuid
+ *                 description: Bind the key to a member — checks run as their assigned roles and audit entries name them. Omit for an org-wide (CI/service) key, which must then send roleName on /check. 400 for members of another org or deactivated members.
  *     responses:
  *       201:
  *         description: API key created

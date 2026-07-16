@@ -15,7 +15,13 @@ auditRouter.get('/:orgId/audit/export', requireAuth, requireOrgRole('ORG_ADMIN',
     include: { actor: { select: { email: true } } },
   });
 
-  const esc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  // Quote-escape AND neutralize spreadsheet formula injection: a metadata
+  // value starting with = + - @ would execute when the CSV opens in Excel.
+  const esc = (v: any) => {
+    let s = String(v ?? '').replace(/"/g, '""');
+    if (/^[=+\-@]/.test(s)) s = `'${s}`;
+    return `"${s}"`;
+  };
   const lines = ['timestamp,action,actor,resource,metadata'];
   for (const r of rows) {
     lines.push([

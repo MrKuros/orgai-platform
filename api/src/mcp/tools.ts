@@ -68,11 +68,16 @@ function checkResult(violations: any[], autoFix: boolean, passedOverride?: boole
 function resolveParams(input: { policyUrl?: string; userRole?: string; authHeader?: string }) {
   return {
     policyUrl: input.policyUrl || process.env.COMPLY_POLICY_URL || undefined,
-    userRole: input.userRole || process.env.COMPLY_USER_ROLE || 'junior',
+    // No junior default in API mode: member-bound keys resolve the developer's
+    // roles server-side, and org-wide keys must be explicit (server 400s with
+    // a clear message otherwise — same fail-loud contract as the git hook).
+    // Standalone callers below fall back to 'junior' (valid in bundled policies).
+    userRole: input.userRole || process.env.COMPLY_USER_ROLE || undefined,
     authHeader: input.authHeader || process.env.COMPLY_AUTH_HEADER,
     bundledPolicyPath: path.resolve(__dirname, 'policies.json'),
   };
 }
+const STANDALONE_DEFAULT_ROLE = 'junior';
 
 export function registerTools(server: McpServer) {
   const isApiMode = !!process.env.COMPLY_API_KEY;
@@ -142,7 +147,7 @@ export function registerTools(server: McpServer) {
         const engine = new PolicyEngine({ policyUrl, authHeader, bundledPolicyPath });
         await engine.load();
         if (!engine.isLoaded()) return noPoliciesError();
-        engine.resolve(userRole);
+        engine.resolve(userRole || STANDALONE_DEFAULT_ROLE);
 
         const evaluator = new Evaluator(engine.getResolvedPolicies());
         const violations = evaluator.evaluateCode(params.code, params.filePath);
@@ -180,7 +185,7 @@ export function registerTools(server: McpServer) {
         const engine = new PolicyEngine({ policyUrl, authHeader, bundledPolicyPath });
         await engine.load();
         if (!engine.isLoaded()) return noPoliciesError();
-        engine.resolve(userRole);
+        engine.resolve(userRole || STANDALONE_DEFAULT_ROLE);
 
         const evaluator = new Evaluator(engine.getResolvedPolicies());
         const violations = evaluator.evaluateCommand(params.command);
@@ -219,7 +224,9 @@ export function registerTools(server: McpServer) {
       try {
         if (isApiMode && client) {
           const orgInfo = await client.getOrgFromApiKey();
-          const res = await client.resolveRole(orgInfo.orgId, userRole);
+          // Server overrides the role for member-bound keys; org-wide keys need an
+          // explicit role (or COMPLY_USER_ROLE). '_' resolves bound-member roles.
+          const res = await client.resolveRole(orgInfo.orgId, userRole || '_');
           return {
             content: [{
               type: "text" as const,
@@ -236,7 +243,7 @@ export function registerTools(server: McpServer) {
         const engine = new PolicyEngine({ policyUrl, authHeader, bundledPolicyPath });
         await engine.load();
         if (!engine.isLoaded()) return noPoliciesError();
-        engine.resolve(userRole);
+        engine.resolve(userRole || STANDALONE_DEFAULT_ROLE);
 
         const role = userRole;
         const displayName = engine.getCurrentRoleDisplay();
@@ -280,7 +287,7 @@ export function registerTools(server: McpServer) {
         const engine = new PolicyEngine({ policyUrl, authHeader, bundledPolicyPath });
         await engine.load();
         if (!engine.isLoaded()) return noPoliciesError();
-        engine.resolve(userRole);
+        engine.resolve(userRole || STANDALONE_DEFAULT_ROLE);
         evaluator = new Evaluator(engine.getResolvedPolicies());
       }
 

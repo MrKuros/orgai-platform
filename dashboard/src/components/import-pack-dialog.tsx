@@ -54,8 +54,16 @@ export function ImportPackDialog({ open, onOpenChange, roles, onImported }: Impo
     }
   };
 
+  const handleOpenChange = (next: boolean) => {
+    if (!next) {
+      setSelectedPack(null);
+      setSelectedRoleIds([]);
+    }
+    onOpenChange(next);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Import a Policy Pack</DialogTitle>
@@ -120,7 +128,7 @@ export function ImportPackDialog({ open, onOpenChange, roles, onImported }: Impo
             )}
 
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isImporting}>Cancel</Button>
+              <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isImporting}>Cancel</Button>
               <Button onClick={handleImport} disabled={!selectedPack || isImporting}>
                 {isImporting && <Spinner className="mr-2 h-4 w-4" />}
                 Import as Shadow

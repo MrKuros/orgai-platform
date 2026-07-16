@@ -199,8 +199,10 @@ export default function TeamPage() {
                 <tbody className="divide-y">
                   {members.map((member: any) => {
                     const isSelf = member.userId === currentUser?.id;
-                    const displayName = member.user ? `${member.user.firstName || ''} ${member.user.lastName || ''}`.trim() : 'Unknown User';
                     const email = member.user?.email || 'Unknown Email';
+                    // Invited-but-not-signed-up users have a user row with no
+                    // name — fall back to email, never a blank line.
+                    const displayName = (member.user ? `${member.user.firstName || ''} ${member.user.lastName || ''}`.trim() : '') || email;
                     
                     return (
                       <tr key={member.id} className="hover:bg-muted/20 transition-colors">

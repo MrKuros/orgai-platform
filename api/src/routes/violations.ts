@@ -32,7 +32,7 @@ violationsFeedRouter.get('/:orgId/violations/stream', async (req: Request, res: 
   const membership = await prisma.membership.findUnique({
     where: { orgId_userId: { orgId: req.params.orgId, userId: payload.userId } }
   });
-  if (!membership) throw new AppError(403, 'FORBIDDEN', 'Not a member');
+  if (!membership || !membership.active) throw new AppError(403, 'FORBIDDEN', 'Not a member');
 
   const orgId = req.params.orgId;
 

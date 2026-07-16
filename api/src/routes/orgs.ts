@@ -200,8 +200,11 @@ orgsRouter.patch('/:orgId', requireAuth, requireOrgRole('ORG_ADMIN'), validate(u
     });
 
     res.json({ org });
-  } catch (error) {
-    throw new AppError(409, 'ERROR', 'Organization slug might be taken');
+  } catch (error: any) {
+    if (error?.code === 'P2002') {
+      throw new AppError(409, 'ERROR', 'Organization slug is already taken');
+    }
+    throw error;
   }
 });
 
@@ -225,6 +228,9 @@ orgsRouter.patch('/:orgId', requireAuth, requireOrgRole('ORG_ADMIN'), validate(u
  *         description: Organization deleted
  */
 orgsRouter.delete('/:orgId', requireAuth, requireOrgRole('ORG_ADMIN'), async (req, res) => {
+  // ponytail: this audit row is cascade-deleted moments later with the org —
+  // the event survives only in server logs. Ship rows to an external sink
+  // (SIEM webhook / log aggregation) if org-deletion evidence ever matters.
   await writeAuditLog({
     orgId: req.org!.id,
     actorId: req.user!.id,

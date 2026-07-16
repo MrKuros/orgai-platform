@@ -99,6 +99,11 @@ rolesRouter.post('/:orgId/roles', requireAuth, requireOrgRole('POLICY_ADMIN', 'O
 
   if (inheritsFromId) {
     const allRoles = await prisma.role.findMany({ where: { orgId: req.org!.id } });
+    // Parent must exist in THIS org — a foreign id would silently create a
+    // dangling cross-org chain.
+    if (!allRoles.some(r => r.id === inheritsFromId)) {
+      throw new AppError(400, 'ERROR', 'inheritsFromId does not belong to this organization');
+    }
     const visited = new Set<string>();
     let currentId: string | null = inheritsFromId;
     while (currentId) {
@@ -127,8 +132,13 @@ rolesRouter.post('/:orgId/roles', requireAuth, requireOrgRole('POLICY_ADMIN', 'O
     });
 
     res.status(201).json({ role });
-  } catch (error) {
-    throw new AppError(409, 'CONFLICT', 'Role name might be taken in this org');
+  } catch (error: any) {
+    // Only a real unique-constraint hit is "name taken" — a DB blip or failed
+    // audit write must surface as itself, not a misleading 409.
+    if (error?.code === 'P2002') {
+      throw new AppError(409, 'CONFLICT', 'Role name is already taken in this org');
+    }
+    throw error;
   }
 });
 
@@ -184,6 +194,9 @@ rolesRouter.patch('/:orgId/roles/:roleId', requireAuth, requireOrgRole('POLICY_A
       throw new AppError(400, 'CYCLE_DETECTED', 'A role cannot inherit from itself');
     }
     const allRoles = await prisma.role.findMany({ where: { orgId: req.org!.id } });
+    if (!allRoles.some(r => r.id === inheritsFromId)) {
+      throw new AppError(400, 'ERROR', 'inheritsFromId does not belong to this organization');
+    }
     const visited = new Set<string>([roleId]);
     let currentId: string | null = inheritsFromId;
     while (currentId) {

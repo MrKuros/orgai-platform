@@ -201,6 +201,11 @@ export function LiveEvaluatorPreview({ open, onOpenChange }: LiveEvaluatorPrevie
                             >
                               {violation.severity}
                             </Badge>
+                            {violation.shadow && (
+                              <Badge variant="outline" className="text-[10px] border-primary/40 text-primary" title="Shadow policy — logged, never blocks">
+                                SHADOW
+                              </Badge>
+                            )}
                           </div>
                           <p className="text-sm text-muted-foreground">{violation.rule}</p>
                           {violation.fixSuggestion && (

@@ -11,6 +11,7 @@ import { writeAuditLog } from '../services/audit';
 import { createAuthToken, consumeAuthToken } from '../services/authTokens';
 import { sendPasswordResetEmail } from '../services/email';
 import { logger } from '../lib/logger';
+import { assertWithinLimit, limitsFor } from '../lib/plans';
 
 export const authRouter = Router();
 
@@ -132,7 +133,7 @@ authRouter.post('/signup', validate(signupSchema), async (req, res) => {
 
   const fullUser = await prisma.user.findUnique({
     where: { id: result.user.id },
-    include: { memberships: { include: { org: true } } }
+    include: { memberships: { where: { active: true }, include: { org: true } } }
   });
 
   const token = signToken({ userId: result.user.id, email: result.user.email });
@@ -208,7 +209,7 @@ authRouter.post('/login', validate(loginSchema), async (req, res) => {
 
   const user = await prisma.user.findUnique({ 
     where: { email },
-    include: { memberships: { include: { org: true } } }
+    include: { memberships: { where: { active: true }, include: { org: true } } }
   });
   if (!user || !user.passwordHash) throw new AppError(401, 'ERROR', 'Invalid credentials');
 
@@ -342,7 +343,16 @@ authRouter.get('/sso/callback', async (req, res) => {
       where: { orgId_userId: { orgId: org.id, userId: user.id } }
     });
 
+    // A deactivated member authenticating via the org IdP must NOT slip back
+    // in — deactivation is the org's call, reactivate from the team page.
+    if (membership && !membership.active) {
+      throw new AppError(403, 'FORBIDDEN', 'Your membership in this organization is deactivated');
+    }
+
     if (!membership) {
+      // JIT provisioning counts toward the member plan limit like invites do.
+      const memberCount = await prisma.membership.count({ where: { orgId: org.id } });
+      assertWithinLimit(memberCount, limitsFor(org.plan).members, 'Team member', org.plan);
       await prisma.membership.create({
         data: { orgId: org.id, userId: user.id, role: 'MEMBER' }
       });
@@ -364,7 +374,7 @@ authRouter.get('/sso/callback', async (req, res) => {
     // Fetch full user with memberships to get the org
     const fullUser = await prisma.user.findUnique({
       where: { id: user.id },
-      include: { memberships: { include: { org: true } } }
+      include: { memberships: { where: { active: true }, include: { org: true } } }
     });
     
     const { passwordHash: _ph, ...safeUser } = fullUser!;
@@ -458,7 +468,7 @@ authRouter.post('/reset-password', validate(resetPasswordSchema), async (req, re
   const user = await prisma.user.update({
     where: { id: record.userId },
     data: { passwordHash },
-    include: { memberships: { include: { org: true } } }
+    include: { memberships: { where: { active: true }, include: { org: true } } }
   });
 
   if (record.orgId) {
@@ -526,7 +536,10 @@ authRouter.get('/me', requireAuth, async (req, res) => {
   const userWithMemberships = await prisma.user.findUnique({
     where: { id: req.user!.id },
     include: {
+      // Active only: a deactivated membership must not surface as a usable
+      // org in the dashboard (every call to it would 403).
       memberships: {
+        where: { active: true },
         include: { org: true, assignedRoles: true }
       }
     }

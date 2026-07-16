@@ -42,7 +42,8 @@ enforced across every agent your team runs — with the audit trail to prove it.
   `"payments-dev,ml-dev"`: the union of both inheritance chains applies, and
   cross-branch conflicts resolve strictest-wins (enforced beats shadow, then
   ERROR beats WARNING).
-- Role management UI in the dashboard; assigned role per member, editable.
+- Role management UI in the dashboard; assigned roles per member (multiple
+  supported), editable.
 
 ## Enforcement surfaces (defense in depth)
 
@@ -97,6 +98,8 @@ enforced across every agent your team runs — with the audit trail to prove it.
   client-supplied role can never select a weaker policy set) and the audit
   trail names them — checks, violations, and hook bypasses are attributed to
   a person, not "System / Agent". Removing the member removes their keys.
+  Org-wide keys (CI/service) must send an explicit role with every check —
+  role-less checks are rejected (400), never silently defaulted.
 - **Member deactivation** — deactivate instead of delete: history stays, but
   dashboard access and all member-bound keys stop working immediately.
   Reactivate any time. Self- and last-admin-deactivation blocked (409).

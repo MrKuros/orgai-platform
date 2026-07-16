@@ -317,6 +317,52 @@ describe('Resolve & Check Routes', () => {
       expect(winner.status).toBe('ENFORCED');
     });
 
+    it('a SHADOW ancestor policy never displaces an ENFORCED one in a single chain', async () => {
+      // parent role with SHADOW copy of a policy name; child role with an
+      // ENFORCED copy. Ancestor-wins must NOT apply — enforcement stays on.
+      const parent = await request(app)
+        .post(`/v1/orgs/${orgId}/roles`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'chain-parent', displayName: 'Chain Parent' });
+      const child = await request(app)
+        .post(`/v1/orgs/${orgId}/roles`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'chain-child', displayName: 'Chain Child', inheritsFromId: parent.body.role.id });
+
+      await request(app)
+        .post(`/v1/orgs/${orgId}/policies`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'chain-pol', rule: 'child enforced', evaluatorType: 'regex',
+          evaluatorPattern: 'chainMarker', severity: 'ERROR',
+          roleIds: [child.body.role.id]
+        });
+      await request(app)
+        .post(`/v1/orgs/${orgId}/policies`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'chain-pol', rule: 'parent shadow', evaluatorType: 'regex',
+          evaluatorPattern: 'chainMarker', severity: 'ERROR', status: 'SHADOW',
+          roleIds: [parent.body.role.id]
+        });
+
+      const check = await request(app)
+        .post(`/v1/orgs/${orgId}/check`)
+        .set('x-api-key', apiKey)
+        .send({ type: 'code', content: 'const chainMarker = 1;', roleName: 'chain-child' });
+      expect(check.status).toBe(200);
+      expect(check.body.passed).toBe(false); // enforced child policy still blocks
+    });
+
+    it('a logged-in member can run /check with a JWT (dashboard evaluator)', async () => {
+      const res = await request(app)
+        .post(`/v1/orgs/${orgId}/check`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ type: 'code', content: 'const a = 1;', roleName: 'junior' });
+      expect(res.status).toBe(200);
+      expect(res.body.passed).toBe(true);
+    });
+
     it('flipping shadow -> enforced makes the same check block', async () => {
       const patch = await request(app)
         .patch(`/v1/orgs/${orgId}/policies/${shadowPolicyId}`)

@@ -12,6 +12,9 @@ import { meterEvaluation } from '../lib/plans';
 
 export const resolveRouter = Router();
 
+// ponytail: per-process cache — with >1 API instance, other instances serve a
+// stale policy set up to 5 min after an edit. Move to Redis/pg LISTEN if the
+// platform ever runs multi-instance.
 const cache = new Map<string, { data: any, expires: number }>();
 
 export function invalidateResolveCache(orgId?: string) {
@@ -144,6 +147,12 @@ async function resolveSingleRole(orgId: string, roleName: string) {
       const existingPolicy = policyMap.get(policyName);
 
       if (existingPolicy) {
+        // Ancestor-wins on name overrides — EXCEPT a SHADOW ancestor never
+        // displaces an ENFORCED policy (that would silently turn real
+        // enforcement off via a rollout flag). Fail-closed.
+        if (binding.policy.status === 'SHADOW' && existingPolicy.status !== 'SHADOW') {
+          continue;
+        }
         warnings.push({
           policyName,
           overriddenByRole: currentRole.name,
@@ -200,8 +209,21 @@ async function resolveSingleRole(orgId: string, roleName: string) {
  *         description: Role not found
  */
 resolveRouter.get('/:orgId/resolve/:roleName', authOrApiKey, requireOrgAccess, async (req, res) => {
-  const { roleName } = req.params;
   const orgId = req.org!.id;
+
+  // Member-bound keys resolve THEIR roles regardless of the path param — the
+  // policies an agent loads must be the same set /check enforces. '_' is the
+  // explicit "my roles" sentinel MCP clients send when no role is configured.
+  const boundMember = req.apiKeyRecord?.member;
+  const roleName = boundMember
+    ? boundMember.assignedRoles.map(r => r.name).sort().join(',')
+    : req.params.roleName;
+  if (boundMember && !roleName) {
+    throw new AppError(400, 'ERROR', 'This developer has no assigned roles — assign one in the dashboard first');
+  }
+  if (!boundMember && roleName === '_') {
+    throw new AppError(400, 'ERROR', 'roleName is required when using an org-wide API key — or use a developer-bound key');
+  }
 
   const responseData = await resolveRolePolicies(orgId, roleName);
 
@@ -241,7 +263,7 @@ const checkSchema = z.object({
  *         application/json:
  *           schema:
  *             type: object
- *             required: [type, content, roleName]
+ *             required: [type, content]
  *             properties:
  *               type:
  *                 type: string
@@ -252,7 +274,10 @@ const checkSchema = z.object({
  *                 type: string
  *               roleName:
  *                 type: string
+ *                 description: Required for org-wide API keys (400 without it). Ignored for developer-bound keys — the member's assigned roles always apply.
  *     responses:
+ *       400:
+ *         description: roleName missing on an org-wide key, or bound developer has no assigned roles
  *       200:
  *         description: Policy check result
  *         content:
@@ -269,7 +294,10 @@ const checkSchema = z.object({
  *       404:
  *         description: Role not found
  */
-resolveRouter.post('/:orgId/check', requireApiKey, validate(checkSchema), async (req, res) => {
+// Accepts API keys (agents, hook, CI) AND logged-in org members (the
+// dashboard's live evaluator) — a bare 401 here used to nuke valid dashboard
+// sessions via the client's 401-means-expired handler.
+resolveRouter.post('/:orgId/check', authOrApiKey, requireOrgAccess, validate(checkSchema), async (req, res) => {
   const { type, content, filePath } = req.body;
   const orgId = req.org!.id;
 
@@ -284,8 +312,9 @@ resolveRouter.post('/:orgId/check', requireApiKey, validate(checkSchema), async 
       ? 'This developer has no assigned roles — assign one in the dashboard first'
       : 'roleName is required when using an org-wide API key');
   }
-  // Member-bound checks are attributed to the developer in the audit trail.
-  const actorId = boundMember?.userId;
+  // Attribution: developer-bound key -> that developer; JWT (dashboard
+  // evaluator) -> the logged-in user; org-wide key -> unattributed.
+  const actorId = boundMember?.userId ?? req.user?.id;
 
   await meterEvaluation(orgId, req.org!.plan);
 
@@ -314,7 +343,7 @@ resolveRouter.post('/:orgId/check', requireApiKey, validate(checkSchema), async 
         line = content.slice(0, match.index).split('\n').length;
       }
     } else if (type === 'command' && policy.evaluatorType === 'command') {
-      const regex = new RegExp(policy.evaluatorPattern);
+      const regex = new RegExp(policy.evaluatorPattern, policy.evaluatorFlags || '');
       if (regex.test(content)) {
         isViolation = true;
       }

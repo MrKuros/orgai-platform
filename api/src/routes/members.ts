@@ -121,6 +121,12 @@ async function normalizeRoleIds(orgId: string, assignedRoleId?: string | null, a
  *               assignedRoleId:
  *                 type: string
  *                 format: uuid
+ *                 description: Legacy single-role setter — prefer assignedRoleIds
+ *               assignedRoleIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: uuid
  *     responses:
  *       201:
  *         description: Member invited
@@ -161,7 +167,12 @@ membersRouter.post('/:orgId/members/invite', requireAuth, requireOrgRole('ORG_AD
     // Only a duplicate membership is "already a member"; anything else
     // (deleted role mid-flight, DB failure) must surface as itself.
     if (error?.code === 'P2002') {
-      throw new AppError(409, 'ERROR', 'User is already a member of this organization');
+      const inactive = existing && await prisma.membership.findFirst({
+        where: { orgId: req.org!.id, userId: existing.id, active: false }
+      });
+      throw new AppError(409, 'ERROR', inactive
+        ? 'This user is a deactivated member — reactivate them from the team page instead of re-inviting'
+        : 'User is already a member of this organization');
     }
     throw error;
   }
@@ -202,7 +213,7 @@ const updateMemberSchema = z.object({
  * @swagger
  * /v1/orgs/{orgId}/members/{userId}:
  *   patch:
- *     summary: Update member role
+ *     summary: Update member (access level, assigned roles, active status)
  *     tags: [Members]
  *     security:
  *       - bearerAuth: []
@@ -232,9 +243,21 @@ const updateMemberSchema = z.object({
  *                 type: string
  *                 format: uuid
  *                 nullable: true
+ *                 description: Legacy single-role setter — prefer assignedRoleIds
+ *               assignedRoleIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: uuid
+ *                 description: Replaces the member's full set of assigned org roles
+ *               active:
+ *                 type: boolean
+ *                 description: false deactivates — dashboard access and member-bound API keys stop working immediately; history stays. true reactivates.
  *     responses:
  *       200:
  *         description: Member updated
+ *       409:
+ *         description: Self-deactivation, or demoting/deactivating the last active ORG_ADMIN
  */
 membersRouter.patch('/:orgId/members/:userId', requireAuth, requireOrgRole('ORG_ADMIN'), validate(updateMemberSchema), async (req, res) => {
   const { userId } = req.params;
@@ -337,8 +360,10 @@ membersRouter.delete('/:orgId/members/:userId', requireAuth, requireOrgRole('ORG
   const { userId } = req.params;
 
   if (userId === req.user!.id) {
+    // active: true — a deactivated admin can't administer anything, so it
+    // must not count toward "there's still an admin left".
     const adminCount = await prisma.membership.count({
-      where: { orgId: req.org!.id, role: 'ORG_ADMIN' }
+      where: { orgId: req.org!.id, role: 'ORG_ADMIN', active: true }
     });
     if (adminCount <= 1) {
       throw new AppError(409, 'ERROR', 'Cannot remove the last ORG_ADMIN');

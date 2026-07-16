@@ -214,6 +214,8 @@ const updatePolicySchema = z.object({
   fixSuggestion: z.string().optional(),
   severity: z.enum(['ERROR', 'WARNING']).optional(),
   status: z.enum(['ENFORCED', 'SHADOW']).optional(),
+  // Replaces the full set of role bindings (the edit dialog sends this).
+  roleIds: z.array(z.string()).optional(),
 });
 
 /**
@@ -273,6 +275,7 @@ const updatePolicySchema = z.object({
  */
 policiesRouter.patch('/:orgId/policies/:policyId', requireAuth, requireOrgRole('POLICY_ADMIN', 'ORG_ADMIN'), validate(updatePolicySchema), async (req, res) => {
   const { policyId } = req.params;
+  const { roleIds, ...policyBody } = req.body;
 
   const currentPolicy = await prisma.policy.findUnique({
     where: { id: policyId, orgId: req.org!.id }
@@ -287,6 +290,13 @@ policiesRouter.patch('/:orgId/policies/:policyId', requireAuth, requireOrgRole('
   const effPattern = 'evaluatorPattern' in req.body ? req.body.evaluatorPattern : currentPolicy.evaluatorPattern;
   const effFlags = 'evaluatorFlags' in req.body ? req.body.evaluatorFlags : currentPolicy.evaluatorFlags;
   assertValidEvaluator(effType, effPattern, effFlags);
+
+  if (roleIds && roleIds.length > 0) {
+    const owned = await prisma.role.count({ where: { id: { in: roleIds }, orgId: req.org!.id } });
+    if (owned !== roleIds.length) {
+      throw new AppError(400, 'ERROR', 'One or more roleIds do not belong to this organization');
+    }
+  }
 
   const policy = await prisma.$transaction(async (tx) => {
     await tx.policyVersion.create({
@@ -305,10 +315,19 @@ policiesRouter.patch('/:orgId/policies/:policyId', requireAuth, requireOrgRole('
       }
     });
 
+    if (roleIds !== undefined) {
+      await tx.policyBinding.deleteMany({ where: { policyId } });
+      if (roleIds.length > 0) {
+        await tx.policyBinding.createMany({
+          data: roleIds.map((roleId: string) => ({ roleId, policyId }))
+        });
+      }
+    }
+
     return tx.policy.update({
       where: { id: policyId, orgId: req.org!.id },
       data: {
-        ...req.body,
+        ...policyBody,
         currentVersion: { increment: 1 }
       }
     });

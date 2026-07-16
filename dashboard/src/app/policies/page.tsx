@@ -23,7 +23,7 @@ import { ImportPackDialog } from '@/components/import-pack-dialog';
 
 export default function PoliciesPage() {
   const { currentOrg } = useAuth();
-  const { canManagePolicies } = useRole();
+  const { canManagePolicies, isOrgAdmin } = useRole();
   const { toast } = useToast();
   
   const { data: policiesData, mutate: mutatePolicies, isLoading: policiesLoading, error: policiesError } = useSWR<any>(currentOrg ? `/orgs/${currentOrg.id}/policies` : null, fetcher);
@@ -186,9 +186,12 @@ export default function PoliciesPage() {
                           <Button variant="ghost" size="icon" aria-label="Edit policy" onClick={() => setEditingPolicy(policy)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="text-destructive" aria-label="Delete policy" onClick={() => setPolicyToDelete(policy.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {/* delete is ORG_ADMIN-only server-side — don't show a button that 403s */}
+                          {isOrgAdmin && (
+                            <Button variant="ghost" size="icon" className="text-destructive" aria-label="Delete policy" onClick={() => setPolicyToDelete(policy.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       )}
                     </div>

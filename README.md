@@ -11,13 +11,13 @@ One policy source. Every AI agent. Every commit. Proven in an append-only audit 
 [![MCP](https://img.shields.io/badge/MCP-compatible-C8371D.svg)](#connect-a-developer)
 [![Self-hosted](https://img.shields.io/badge/self--hosted-air--gap%20ready-26428B.svg)](#production-deployment)
 
-[**orgai.dev**](https://orgai.dev) · [Quick start](#quick-start) · [Features](FEATURES.md) · [Developer setup](DEVELOPER_SETUP.md) · [Contact](mailto:kashish.patel@orgai.dev)
+[**orgai.dev**](https://orgai.dev) · [Quick start](#quick-start) · [How it works](HOW_IT_WORKS.md) · [Features](FEATURES.md) · [Developer setup](DEVELOPER_SETUP.md) · [Contact](mailto:kashish.patel@orgai.dev)
 
 </div>
 
 ---
 
-Your developers use Claude Code, Cursor, Copilot, Windsurf. OrgAI lets the organization define coding policies once — centrally, per role — and enforces them across every AI agent, every commit, and every CI run.
+Your developers use Claude Code, Cursor, Copilot (agent mode), Windsurf. OrgAI lets the organization define coding policies once — centrally, per role — and enforces them across every AI agent, every commit, and every CI run.
 
 |  | Layer | How | Guarantee |
 |---|---|---|---|

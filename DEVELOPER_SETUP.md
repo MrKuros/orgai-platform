@@ -67,7 +67,10 @@ Get `hooks/pre-commit` from your admin (ships in the OrgAI bundle), then in each
 cp pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 git config orgai.apiurl https://<orgai-host>
 git config orgai.apikey oai_...
-git config orgai.role   <your-role>        # default: junior
+git config orgai.role   <your-role>   # skip with a developer-bound key (server
+                                      # uses your assigned roles); REQUIRED for
+                                      # org-wide keys — role-less checks are
+                                      # rejected (400), never silently defaulted
 ```
 
 (Or set `COMPLY_API_URL` / `COMPLY_API_KEY` / `COMPLY_ROLE` as env vars.

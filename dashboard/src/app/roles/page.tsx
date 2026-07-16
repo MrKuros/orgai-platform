@@ -57,7 +57,7 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
 
 export default function RolesPage() {
   const { currentOrg } = useAuth();
-  const { canManagePolicies } = useRole();
+  const { canManagePolicies, isOrgAdmin } = useRole();
   const { toast } = useToast();
 
   const { data, mutate, isLoading, error } = useSWR<any>(currentOrg ? `/orgs/${currentOrg.id}/roles` : null, fetcher);
@@ -264,9 +264,12 @@ export default function RolesPage() {
                       <Button variant="outline" className="w-full" onClick={() => openEdit(selectedRole)}>
                         Edit Role
                       </Button>
-                      <Button variant="destructive" className="w-full" onClick={() => setRoleToDelete(selectedRole.id)}>
-                        Delete Role
-                      </Button>
+                      {/* delete is ORG_ADMIN-only server-side — don't show a button that 403s */}
+                      {isOrgAdmin && (
+                        <Button variant="destructive" className="w-full" onClick={() => setRoleToDelete(selectedRole.id)}>
+                          Delete Role
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>

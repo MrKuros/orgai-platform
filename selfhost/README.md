@@ -45,7 +45,11 @@ They then browse to that same address.
 One-time setup:
 
 1. In the dashboard: create your policies, then create an **API key**
-   (Settings → API Keys — copy it, it is shown once).
+   (Settings → API Keys — copy it, it is shown once). Prefer a
+   **developer-bound key** per developer (pick them in the "Developer" field):
+   their checks then run as their assigned roles automatically and the audit
+   trail names them. Reserve org-wide keys for CI/service use — those must
+   send an explicit role with every check.
 2. Paste it into `.env` as `COMPLY_API_KEY=...` and run `docker compose up -d`
    again. This switches the built-in MCP server to enforce your live policies
    and record every check in the audit log.
@@ -54,16 +58,20 @@ Then each developer adds OrgAI to their agent — any MCP-capable tool works.
 Two endpoints are served: `http://<server>:8080/mcp` (streamable HTTP, current
 standard) and `http://<server>:8080/mcp/sse` (SSE, for older clients).
 
+With `COMPLY_API_KEY` set, the MCP endpoints require each client to send an
+`x-api-key` header — use each developer's own key:
+
 **Claude Code**
 
 ```bash
-claude mcp add --transport http orgai http://<server>:8080/mcp
+claude mcp add --transport http orgai http://<server>:8080/mcp \
+  --header "x-api-key: oai_..."
 ```
 
 **Cursor** — `.cursor/mcp.json` in the project (or global settings):
 
 ```json
-{ "mcpServers": { "orgai": { "url": "http://<server>:8080/mcp" } } }
+{ "mcpServers": { "orgai": { "url": "http://<server>:8080/mcp", "headers": { "x-api-key": "oai_..." } } } }
 ```
 
 **OpenAI Codex** — `~/.codex/config.toml`:
@@ -71,11 +79,12 @@ claude mcp add --transport http orgai http://<server>:8080/mcp
 ```toml
 [mcp_servers.orgai]
 url = "http://<server>:8080/mcp"
+http_headers = { "x-api-key" = "oai_..." }
 ```
 
-**Anything else** (Windsurf, Copilot, JetBrains…): point its MCP config at
-`http://<server>:8080/mcp`; fall back to the `/mcp/sse` endpoint if the tool
-only supports SSE.
+**Anything else** (Windsurf, Copilot in VS Code agent mode, JetBrains…): point
+its MCP config at `http://<server>:8080/mcp` with the same `x-api-key` header;
+fall back to the `/mcp/sse` endpoint if the tool only supports SSE.
 
 ## 3. Inviting team members
 
@@ -87,6 +96,10 @@ docker compose logs api | grep -i invite
 ```
 
 Send them the link; they set a password and are in.
+
+Someone leaving? **Deactivate** them from the Team page instead of deleting —
+their history stays, but their dashboard access and any developer-bound API
+keys stop working immediately. Reactivate any time.
 
 ## 4. Audit trail
 
@@ -121,12 +134,18 @@ chmod +x YOUR_REPO/.git/hooks/pre-commit
 cd YOUR_REPO
 git config orgai.apiurl http://<server>:8080
 git config orgai.apikey oai_...      # from dashboard → API Keys
-git config orgai.role junior        # role to enforce
+git config orgai.role junior        # only for ORG-WIDE keys — skip this line
+                                    # with a developer-bound key (the server
+                                    # uses the developer's assigned roles;
+                                    # role-less checks on org-wide keys are
+                                    # rejected with a 400)
 ```
 
 Commits with ERROR-severity violations are blocked (with file + line + fix
-suggestion); WARNING-level ones are printed but allowed. Bypass once with
-`COMPLY_SKIP=1 git commit ...`.
+suggestion); WARNING-level ones are printed but allowed; shadow-mode policies
+print as `[SHADOW ...]` and never block. Bypass once with
+`COMPLY_SKIP=1 git commit ...` — the bypass is recorded in the org audit trail
+as `hook.bypassed`.
 
 **CI:** the same script checks a ref range — add to your pipeline:
 

@@ -28,9 +28,13 @@ ROLE="${COMPLY_ROLE:-$(git config orgai.role || true)}"
 if [ "$COMPLY_SKIP" = "1" ]; then
   if [ -n "$API_KEY" ] && command -v curl >/dev/null 2>&1; then
     REPO_NAME=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
+    # Strip JSON-breaking characters — a quote in the repo dir or $USER must
+    # not turn the bypass record into a silently-rejected 400.
+    SAFE_REPO=$(printf '%s' "${REPO_NAME:-unknown}" | tr -d '"\\')
+    SAFE_ACTOR=$(printf '%s' "${USER:-unknown}" | tr -d '"\\')
     curl -m 2 -s -o /dev/null -X POST "$API_URL/v1/orgs/_/hook-skip" \
       -H "x-api-key: $API_KEY" -H 'Content-Type: application/json' \
-      -d "{\"repo\":\"${REPO_NAME:-unknown}\",\"actor\":\"${USER:-unknown}\"}" 2>/dev/null &
+      -d "{\"repo\":\"$SAFE_REPO\",\"actor\":\"$SAFE_ACTOR\"}" 2>/dev/null &
   fi
   echo "orgai: compliance check bypassed (COMPLY_SKIP=1) — recorded in org audit trail" >&2
   exit 0
@@ -53,11 +57,14 @@ if ! command -v python3 >/dev/null 2>&1 && ! command -v node >/dev/null 2>&1; th
   exit 0
 fi
 
+# core.quotePath=false: with the default (true), non-ASCII filenames come out
+# C-quoted ("na\303\257ve.ts" with literal quotes), git show then finds nothing,
+# and the file is silently skipped — an invisible enforcement bypass.
 if [ -n "$1" ] && [ -n "$2" ]; then
-  FILES=$(git diff --name-only --diff-filter=ACMR "$1" "$2")
+  FILES=$(git -c core.quotePath=false diff --name-only --diff-filter=ACMR "$1" "$2")
   SRC="$2"
 else
-  FILES=$(git diff --cached --name-only --diff-filter=ACMR)
+  FILES=$(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR)
   SRC=":"
 fi
 
@@ -73,12 +80,20 @@ trap 'rm -f "$FAILMARK"' EXIT
 # compliance bypass).
 printf '%s\n' "$FILES" | while IFS= read -r f; do
   [ -z "$f" ] && continue
+  # A name that still arrives quoted (shouldn't happen with quotePath=false)
+  # can't be checked reliably — fail loud rather than silently skip it.
+  case "$f" in
+    \"*) echo "orgai: cannot check file '$f' (unparseable name) — commit blocked" >&2; exit 1 ;;
+  esac
   case "$SRC" in
     :) CONTENT=$(git show ":$f" 2>/dev/null) ;;
     *) CONTENT=$(git show "$SRC:$f" 2>/dev/null) ;;
   esac
   [ -z "$CONTENT" ] && continue
-  [ "$(printf '%s' "$CONTENT" | wc -c)" -gt 200000 ] && continue
+  if [ "$(printf '%s' "$CONTENT" | wc -c)" -gt 200000 ]; then
+    echo "orgai: skipped $f (over 200KB — not checked)" >&2
+    continue
+  fi
   # skip binaries: let git classify (it prints "-\t-\t" for binary in --numstat).
   # Portable — avoids GNU/BSD-only `grep -I` (busybox lacks it, errored -> skipped
   # every file = bypass).
@@ -116,10 +131,14 @@ print(json.dumps(b))' "$ROLE" "$f" 2>/dev/null) \
       echo 1 > "$FAILMARK"
       echo "orgai: policy violations in $f:" >&2
       if command -v jq >/dev/null 2>&1; then
-        printf '%s' "$RESP" | jq -r '.violations[] | "  [\(if .shadow then "SHADOW " else "" end)\(.severity)] \(.policyName)\(if .line then " (line \(.line))" else "" end): \(.rule)\n      fix: \(.fixSuggestion)"' >&2
+        printf '%s' "$RESP" | jq -r '.violations[] | "  [\(if .shadow then "SHADOW " else "" end)\(.severity)] \(.policyName)\(if .line then " (line \(.line))" else "" end): \(.rule)\n      fix: \(.fixSuggestion // "n/a")"' >&2
       else
         printf '%s\n' "$RESP" >&2
       fi
+      ;;
+    *'roleName is required'*|*'no assigned roles'*)
+      echo "orgai: this API key needs a role — set 'git config orgai.role <role>' (or COMPLY_ROLE), or ask your admin for a developer-bound key. Commit blocked." >&2
+      exit 1
       ;;
     *)
       echo "orgai: unexpected API response — commit blocked. Set COMPLY_SKIP=1 to bypass." >&2

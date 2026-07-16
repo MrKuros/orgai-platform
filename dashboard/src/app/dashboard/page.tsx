@@ -5,7 +5,7 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
 import { Shield, GitBranch, Users, ShieldAlert, Plus, Activity, Sparkles, Zap, Clock, Download, AlertTriangle } from 'lucide-react';
-import { useAuth } from '@/lib/auth';
+import { useAuth, useRole } from '@/lib/auth';
 import { fetcher, seedDefaults, exportAuditCsv, ApiError } from '@/lib/api';
 import type { OrgStats } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -27,6 +27,7 @@ function relativeTime(iso: string): string {
 
 export default function DashboardPage() {
   const { currentOrg } = useAuth();
+  const { canManagePolicies } = useRole();
   const { toast } = useToast();
 
   const { data: policiesData, mutate: mutatePolicies, error: policiesError } = useSWR<any>(currentOrg ? `/orgs/${currentOrg.id}/policies` : null, fetcher);
@@ -66,13 +67,14 @@ export default function DashboardPage() {
     }
   };
   
-  // Get general recent activity
-  const { data: recentActivity, mutate: mutateActivity, error: activityError } = useSWR<any>(
-    currentOrg ? `/orgs/${currentOrg.id}/audit?limit=5` : null,
+  // Recent activity — the audit endpoint is admin-only (403 for MEMBER), so
+  // only fetch for admin roles and never let its error blank the whole page.
+  const { data: recentActivity, mutate: mutateActivity } = useSWR<any>(
+    currentOrg && canManagePolicies ? `/orgs/${currentOrg.id}/audit?limit=5` : null,
     fetcher
   );
 
-  const loadError = policiesError || rolesError || membersError || statsError || activityError;
+  const loadError = policiesError || rolesError || membersError || statsError;
   const handleRetry = () => {
     mutatePolicies();
     mutateRoles();
