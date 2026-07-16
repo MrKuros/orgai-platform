@@ -40,8 +40,10 @@ function failClosedError(err: any) {
   };
 }
 
-const isBlocker = (v: any) => v.severity === 'error' || v.severity === 'ERROR';
-const isWarning = (v: any) => v.severity === 'warning' || v.severity === 'WARNING';
+// Shadow violations (policy in shadow/rollout mode) are informational: they
+// never count as blockers or warnings, so they never trip BLOCKED guidance.
+const isBlocker = (v: any) => !v.shadow && (v.severity === 'error' || v.severity === 'ERROR');
+const isWarning = (v: any) => !v.shadow && (v.severity === 'warning' || v.severity === 'WARNING');
 
 // Build a check_compliance/check_command response. Emits violations ONCE plus
 // blockerCount/warningCount rather than re-serializing blocker/warning subsets
@@ -49,14 +51,16 @@ const isWarning = (v: any) => v.severity === 'warning' || v.severity === 'WARNIN
 function checkResult(violations: any[], autoFix: boolean, passedOverride?: boolean) {
   const blockerCount = violations.filter(isBlocker).length;
   const warningCount = violations.filter(isWarning).length;
+  const shadowCount = violations.filter((v: any) => v.shadow).length;
   const passed = passedOverride ?? blockerCount === 0;
   const summary = violations.length > 0
-    ? `${blockerCount} errors, ${warningCount} warning found`
+    ? `${blockerCount} errors, ${warningCount} warning found` +
+      (shadowCount > 0 ? `, ${shadowCount} shadow hit(s) — would block once the policy is enforced` : '')
     : "All checks passed";
   return {
     content: [{
       type: "text" as const,
-      text: JSON.stringify({ passed, violations, blockerCount, warningCount, summary, guidance: guidance(blockerCount, warningCount, autoFix) }, null, 2)
+      text: JSON.stringify({ passed, violations, blockerCount, warningCount, shadowCount, summary, guidance: guidance(blockerCount, warningCount, autoFix) }, null, 2)
     }]
   };
 }
@@ -209,6 +213,7 @@ export function registerTools(server: McpServer) {
         severity: p.severity,
         fixSuggestion: p.fixSuggestion || p.fix_suggestion || undefined,
         setBy: p.setByDisplayName || undefined,
+        ...(p.status === 'SHADOW' ? { shadow: true } : {}),
       });
 
       try {
@@ -302,8 +307,8 @@ export function registerTools(server: McpServer) {
           
           if (violations.length > 0) {
             files.push({ path: currentFile, violations });
-            totalBlockers += violations.filter((v: any) => v.severity === 'error' || v.severity === 'ERROR').length;
-            totalWarnings += violations.filter((v: any) => v.severity === 'warning' || v.severity === 'WARNING').length;
+            totalBlockers += violations.filter(isBlocker).length;
+            totalWarnings += violations.filter(isWarning).length;
           }
         }
       };
@@ -329,8 +334,8 @@ export function registerTools(server: McpServer) {
             
             if (violations.length > 0) {
               commands.push({ command: content.trim(), violations });
-              totalBlockers += violations.filter((v: any) => v.severity === 'error' || v.severity === 'ERROR').length;
-              totalWarnings += violations.filter((v: any) => v.severity === 'warning' || v.severity === 'WARNING').length;
+              totalBlockers += violations.filter(isBlocker).length;
+              totalWarnings += violations.filter(isWarning).length;
             }
           }
         }

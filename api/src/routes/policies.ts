@@ -93,6 +93,7 @@ const createPolicySchema = z.object({
   evaluatorFlags: z.string().optional(),
   fixSuggestion: z.string().optional(),
   severity: z.enum(['ERROR', 'WARNING']),
+  status: z.enum(['ENFORCED', 'SHADOW']).optional(),
   roleIds: z.array(z.string()).default([])
 });
 
@@ -137,6 +138,10 @@ const createPolicySchema = z.object({
  *               severity:
  *                 type: string
  *                 enum: [ERROR, WARNING]
+ *               status:
+ *                 type: string
+ *                 enum: [ENFORCED, SHADOW]
+ *                 description: SHADOW policies are evaluated and audit-logged but never block
  *               roleIds:
  *                 type: array
  *                 items:
@@ -208,6 +213,7 @@ const updatePolicySchema = z.object({
   evaluatorFlags: z.string().optional().nullable(),
   fixSuggestion: z.string().optional(),
   severity: z.enum(['ERROR', 'WARNING']).optional(),
+  status: z.enum(['ENFORCED', 'SHADOW']).optional(),
 });
 
 /**
@@ -257,6 +263,10 @@ const updatePolicySchema = z.object({
  *               severity:
  *                 type: string
  *                 enum: [ERROR, WARNING]
+ *               status:
+ *                 type: string
+ *                 enum: [ENFORCED, SHADOW]
+ *                 description: SHADOW policies are evaluated and audit-logged but never block
  *     responses:
  *       200:
  *         description: Policy updated
@@ -310,7 +320,9 @@ policiesRouter.patch('/:orgId/policies/:policyId', requireAuth, requireOrgRole('
     orgId: req.org!.id,
     actorId: req.user!.id,
     action: 'policy.updated',
-    resource: policy.id
+    resource: policy.id,
+    // Enforcement-state flips (shadow <-> enforced) must be traceable.
+    metadata: req.body.status ? { status: req.body.status } : undefined
   });
 
   dispatchWebhook(req.org!.id, 'policy.updated', { policy });

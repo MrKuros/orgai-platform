@@ -216,4 +216,122 @@ describe('Resolve & Check Routes', () => {
       expect(res.status).toBe(404);
     });
   });
+
+  describe('shadow policies', () => {
+    let shadowRoleId: string;
+    let shadowPolicyId: string;
+
+    beforeAll(async () => {
+      const roleRes = await request(app)
+        .post(`/v1/orgs/${orgId}/roles`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'shadow-tester', displayName: 'Shadow Tester' });
+      shadowRoleId = roleRes.body.role.id;
+
+      const polRes = await request(app)
+        .post(`/v1/orgs/${orgId}/policies`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'no-todo-comments',
+          rule: 'No TODO comments',
+          evaluatorType: 'regex',
+          evaluatorPattern: 'TODO:',
+          severity: 'ERROR',
+          status: 'SHADOW',
+          roleIds: [shadowRoleId]
+        });
+      shadowPolicyId = polRes.body.policy.id;
+      expect(polRes.body.policy.status).toBe('SHADOW');
+    });
+
+    it('a shadow ERROR violation is reported but never blocks', async () => {
+      const res = await request(app)
+        .post(`/v1/orgs/${orgId}/check`)
+        .set('x-api-key', apiKey)
+        .send({ type: 'code', content: '// TODO: fix later', roleName: 'shadow-tester' });
+      expect(res.status).toBe(200);
+      expect(res.body.passed).toBe(true);
+      expect(res.body.violations.length).toBe(1);
+      expect(res.body.violations[0].shadow).toBe(true);
+      expect(res.body.violations[0].severity).toBe('ERROR');
+    });
+
+    it('shadow hits land in the audit trail as policy.shadow_violated', async () => {
+      const res = await request(app)
+        .get(`/v1/orgs/${orgId}/audit?action=policy.shadow_violated`)
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      const hit = res.body.data.find((l: any) => l.metadata?.policyName === 'no-todo-comments');
+      expect(hit).toBeDefined();
+      expect(hit.metadata.severity).toBe('ERROR');
+    });
+
+    it('policy.checked audit rows carry shadowCount', async () => {
+      const res = await request(app)
+        .get(`/v1/orgs/${orgId}/audit?action=policy.checked`)
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      const row = res.body.data.find((l: any) => l.metadata?.roleName === 'shadow-tester');
+      expect(row).toBeDefined();
+      expect(row.metadata.shadowCount).toBe(1);
+      expect(row.metadata.blockerCount).toBe(0);
+      expect(row.metadata.passed).toBe(true);
+    });
+
+    it('an enforced policy never loses a cross-branch name conflict to a shadow one', async () => {
+      // Same policy name in two sibling branches: enforced WARNING must beat
+      // shadow ERROR — otherwise flipping a copy to shadow would silently
+      // disable real enforcement.
+      const aRes = await request(app)
+        .post(`/v1/orgs/${orgId}/roles`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'branch-a', displayName: 'Branch A' });
+      const bRes = await request(app)
+        .post(`/v1/orgs/${orgId}/roles`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'branch-b', displayName: 'Branch B' });
+
+      await request(app)
+        .post(`/v1/orgs/${orgId}/policies`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'conflict-pol', rule: 'enforced warning', evaluatorType: 'regex',
+          evaluatorPattern: 'conflictMarker', severity: 'WARNING',
+          roleIds: [aRes.body.role.id]
+        });
+      await request(app)
+        .post(`/v1/orgs/${orgId}/policies`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'conflict-pol', rule: 'shadow error', evaluatorType: 'regex',
+          evaluatorPattern: 'conflictMarker', severity: 'ERROR', status: 'SHADOW',
+          roleIds: [bRes.body.role.id]
+        });
+
+      const res = await request(app)
+        .get(`/v1/orgs/${orgId}/resolve/branch-a,branch-b`)
+        .set('x-api-key', apiKey);
+      expect(res.status).toBe(200);
+      const winner = res.body.policies.find((p: any) => p.name === 'conflict-pol');
+      expect(winner.rule).toBe('enforced warning');
+      expect(winner.status).toBe('ENFORCED');
+    });
+
+    it('flipping shadow -> enforced makes the same check block', async () => {
+      const patch = await request(app)
+        .patch(`/v1/orgs/${orgId}/policies/${shadowPolicyId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'ENFORCED' });
+      expect(patch.status).toBe(200);
+      expect(patch.body.policy.status).toBe('ENFORCED');
+
+      const res = await request(app)
+        .post(`/v1/orgs/${orgId}/check`)
+        .set('x-api-key', apiKey)
+        .send({ type: 'code', content: '// TODO: fix later', roleName: 'shadow-tester' });
+      expect(res.status).toBe(200);
+      expect(res.body.passed).toBe(false);
+      expect(res.body.violations[0].shadow).toBeUndefined();
+    });
+  });
 });

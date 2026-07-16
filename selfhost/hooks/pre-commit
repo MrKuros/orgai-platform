@@ -101,7 +101,7 @@ printf '%s\n' "$FILES" | while IFS= read -r f; do
     *'"passed":true'*)
       echo "orgai: warnings in $f (commit allowed):" >&2
       if command -v jq >/dev/null 2>&1; then
-        printf '%s' "$RESP" | jq -r '.violations[] | "  [\(.severity)] \(.policyName)\(if .line then " (line \(.line))" else "" end): \(.rule)"' >&2
+        printf '%s' "$RESP" | jq -r '.violations[] | "  [\(if .shadow then "SHADOW " else "" end)\(.severity)] \(.policyName)\(if .line then " (line \(.line))" else "" end): \(.rule)"' >&2
       else
         printf '%s\n' "$RESP" >&2
       fi
@@ -110,7 +110,7 @@ printf '%s\n' "$FILES" | while IFS= read -r f; do
       echo 1 > "$FAILMARK"
       echo "orgai: policy violations in $f:" >&2
       if command -v jq >/dev/null 2>&1; then
-        printf '%s' "$RESP" | jq -r '.violations[] | "  [\(.severity)] \(.policyName)\(if .line then " (line \(.line))" else "" end): \(.rule)\n      fix: \(.fixSuggestion)"' >&2
+        printf '%s' "$RESP" | jq -r '.violations[] | "  [\(if .shadow then "SHADOW " else "" end)\(.severity)] \(.policyName)\(if .line then " (line \(.line))" else "" end): \(.rule)\n      fix: \(.fixSuggestion)"' >&2
       else
         printf '%s\n' "$RESP" >&2
       fi

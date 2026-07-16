@@ -158,6 +158,11 @@ export default function PoliciesPage() {
                           <Badge variant={policy.severity === 'ERROR' ? 'destructive' : 'secondary'} className="text-[10px]">
                             {policy.severity}
                           </Badge>
+                          {policy.status === 'SHADOW' && (
+                            <Badge variant="outline" className="text-[10px] border-primary/40 text-primary" title="Evaluated and logged, never blocks">
+                              SHADOW
+                            </Badge>
+                          )}
                           {policy.evaluatorType !== 'none' && (
                             <Badge variant="outline" className="text-[10px] bg-muted">
                               {policy.evaluatorType}

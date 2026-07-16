@@ -11,6 +11,12 @@ enforced across every agent your team runs — with the audit trail to prove it.
   is told about, plus deterministic pattern evaluators for automatic enforcement.
   Evaluators are compile-checked and capped at creation (bad regex → 400).
 - **Two severities** — `ERROR` blocks the action; `WARNING` flags it but allows.
+- **Shadow mode (safe rollout)** — a policy can be created or switched to
+  `SHADOW`: it is evaluated on every check and every would-have-blocked hit is
+  audit-logged (`policy.shadow_violated`), but it never blocks an agent, commit,
+  or build. Measure a new policy's noise in the dashboard audit trail, then flip
+  it to `ENFORCED` — the flip itself is audit-logged. An enforced policy never
+  loses a name conflict to a shadow one.
 - **Fail-closed by design** — unknown role, unreachable policy source, or invalid
   remote config refuses instead of silently allowing. Violations are blocked
   *before* code is written; the agent receives the reason and fix guidance
@@ -30,7 +36,8 @@ enforced across every agent your team runs — with the audit trail to prove it.
   every security rule set above them, nothing wired by hand.
 - **Multiple superiors supported** — a developer under two departments checks as
   `"payments-dev,ml-dev"`: the union of both inheritance chains applies, and
-  cross-branch conflicts resolve strictest-wins (ERROR beats WARNING).
+  cross-branch conflicts resolve strictest-wins (enforced beats shadow, then
+  ERROR beats WARNING).
 - Role management UI in the dashboard; assigned role per member, editable.
 
 ## Enforcement surfaces (defense in depth)

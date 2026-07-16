@@ -134,6 +134,7 @@ model Policy {
   evaluatorFlags String?
   fixSuggestion  String         @default("")
   severity       PolicySeverity @default(ERROR)
+  status         PolicyStatus   @default(ENFORCED)
   currentVersion Int           @default(1)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
@@ -146,6 +147,13 @@ model Policy {
 enum PolicySeverity {
   ERROR
   WARNING
+}
+
+// SHADOW: evaluated on every check, would-block hits are audit-logged, but it
+// never blocks a commit/build. Rollout tool — measure noise before enforcing.
+enum PolicyStatus {
+  ENFORCED
+  SHADOW
 }
 
 model PolicyBinding {

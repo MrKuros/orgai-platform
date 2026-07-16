@@ -23,6 +23,7 @@ const policySchema = z.object({
   evaluatorFlags: z.string().optional(),
   fixSuggestion: z.string().optional(),
   severity: z.enum(['ERROR', 'WARNING']),
+  status: z.enum(['ENFORCED', 'SHADOW']).default('ENFORCED'),
   roleIds: z.array(z.string()).default([]),
 });
 
@@ -53,6 +54,7 @@ export function PolicyForm({ defaultValues, roles, onSubmit, isLoading }: Policy
       evaluatorFlags: '',
       fixSuggestion: '',
       severity: 'ERROR',
+      status: 'ENFORCED',
       roleIds: [],
       ...defaultValues,
     },
@@ -144,6 +146,20 @@ export function PolicyForm({ defaultValues, roles, onSubmit, isLoading }: Policy
             </Select>
             <p className="text-[0.8rem] text-muted-foreground mt-2">If this policy uses a Regex evaluator, provide the pattern that indicates what&apos;s allowed or disallowed.</p>
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="status">Enforcement</Label>
+          <Select onValueChange={(val) => setValue('status', val as 'ENFORCED' | 'SHADOW')} defaultValue={defaultValues?.status || 'ENFORCED'}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select enforcement" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ENFORCED">Enforced — violations block per severity</SelectItem>
+              <SelectItem value="SHADOW">Shadow — log violations, never block (test before enforcing)</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-[0.8rem] text-muted-foreground">Start new policies in Shadow to measure how often they would block, then switch to Enforced.</p>
         </div>
 
         {evaluatorType !== 'none' && (

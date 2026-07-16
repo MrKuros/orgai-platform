@@ -318,6 +318,8 @@ export default function DashboardPage() {
                         <p className="text-sm font-medium">
                           {log.action === 'policy.violated' ? (
                             <span className="text-destructive">Policy Violation</span>
+                          ) : log.action === 'policy.shadow_violated' ? (
+                            <span>Shadow policy hit{log.metadata?.policyName ? `: ${log.metadata.policyName}` : ''} (would block when enforced)</span>
                           ) : log.action.replace(/\./g, ' ')}
                         </p>
                         <p className="text-xs text-muted-foreground">

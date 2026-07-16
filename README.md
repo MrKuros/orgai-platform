@@ -27,6 +27,8 @@ Your developers use Claude Code, Cursor, Copilot, Windsurf. OrgAI lets the organ
 
 Every check, violation, and bypass lands in an **append-only audit trail** — evidence for SOC 2 / ISO 27001 / HIPAA / DPDP audits. Evidence, not certification.
 
+**Roll out policies safely:** start a new policy in **shadow mode** — it's evaluated on every check and would-have-blocked hits are audit-logged, but nothing blocks. Watch its noise in the audit trail, then flip it to enforced.
+
 **Why it's fast and free to run:** policy checks are deterministic pattern/AST rules — no LLM calls, no token spend, sub-second. **Why it's private:** runs in your VPC or fully air-gapped; your code never leaves your infrastructure.
 
 ## Where it sits

@@ -1,5 +1,7 @@
 export type MembershipRole = 'ORG_ADMIN' | 'POLICY_ADMIN' | 'MEMBER';
 export type PolicySeverity = 'ERROR' | 'WARNING';
+// SHADOW: evaluated + audit-logged, never blocks. Rollout mode for new policies.
+export type PolicyStatus = 'ENFORCED' | 'SHADOW';
 
 export interface User {
   id: string;
@@ -55,6 +57,7 @@ export interface Policy {
   evaluatorFlags: string | null;
   fixSuggestion: string;
   severity: PolicySeverity;
+  status: PolicyStatus;
   currentVersion: number;
   createdAt: string;
   updatedAt: string;
@@ -128,6 +131,7 @@ export interface CreatePolicyInput {
   evaluatorFlags?: string;
   fixSuggestion?: string;
   severity: PolicySeverity;
+  status?: PolicyStatus;
   roleIds?: string[];
 }
 

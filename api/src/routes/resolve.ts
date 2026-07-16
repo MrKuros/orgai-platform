@@ -65,8 +65,11 @@ export async function resolveRolePolicies(orgId: string, roleName: string) {
         continue;
       }
       if (existing.id === policy.id) continue; // same policy via two branches — no conflict
-      // Cross-branch name conflict: strictest severity wins.
-      const winner = existing.severity === 'ERROR' ? existing : policy.severity === 'ERROR' ? policy : existing;
+      // Cross-branch name conflict: strictest wins. ENFORCED beats SHADOW
+      // (a shadow policy must never displace real enforcement), then ERROR
+      // beats WARNING.
+      const rank = (p: any) => (p.status !== 'SHADOW' ? 2 : 0) + (p.severity === 'ERROR' ? 1 : 0);
+      const winner = rank(policy) > rank(existing) ? policy : existing;
       const loser = winner === existing ? policy : existing;
       policyMap.set(policy.name, winner);
       warnings.push({
@@ -303,6 +306,7 @@ resolveRouter.post('/:orgId/check', requireApiKey, validate(checkSchema), async 
     }
 
     if (isViolation) {
+      const isShadow = policy.status === 'SHADOW';
       violations.push({
         policyId: policy.id,
         policyName: policy.name,
@@ -310,10 +314,25 @@ resolveRouter.post('/:orgId/check', requireApiKey, validate(checkSchema), async 
         severity: policy.severity,
         fixSuggestion: policy.fixSuggestion,
         setByDisplayName: policy.setByDisplayName,
-        line
+        line,
+        ...(isShadow ? { shadow: true } : {})
       });
 
-      if (policy.severity === 'ERROR') {
+      if (isShadow) {
+        // Shadow hits get their own audit action so an admin can measure a
+        // policy's noise ("how often would this have blocked?") before enforcing.
+        await writeAuditLog({
+          orgId,
+          action: 'policy.shadow_violated',
+          metadata: {
+            policyId: policy.id,
+            policyName: policy.name,
+            severity: policy.severity,
+            roleName,
+            filePath: filePath?.substring(0, 200)
+          }
+        });
+      } else if (policy.severity === 'ERROR') {
         await writeAuditLog({
           orgId,
           action: 'policy.violated',
@@ -323,7 +342,10 @@ resolveRouter.post('/:orgId/check', requireApiKey, validate(checkSchema), async 
     }
   }
 
-  const hasErrors = violations.some(v => v.severity === 'ERROR');
+  // Shadow violations are reported but never block: passed considers only
+  // enforced ERROR violations.
+  const enforced = violations.filter(v => !v.shadow);
+  const hasErrors = enforced.some(v => v.severity === 'ERROR');
 
   // Every check is audited — passed or not — so "show me all checks for
   // developer X" has an answer. ERROR violations additionally log policy.violated.
@@ -335,14 +357,17 @@ resolveRouter.post('/:orgId/check', requireApiKey, validate(checkSchema), async 
       type,
       filePath: filePath?.substring(0, 200),
       passed: !hasErrors,
-      blockerCount: violations.filter(v => v.severity === 'ERROR').length,
-      warningCount: violations.filter(v => v.severity === 'WARNING').length
+      blockerCount: enforced.filter(v => v.severity === 'ERROR').length,
+      warningCount: enforced.filter(v => v.severity === 'WARNING').length,
+      shadowCount: violations.length - enforced.length
     }
   });
 
   if (hasErrors) {
-    dispatchWebhook(orgId, 'policy.violated', { violations });
-    broadcastViolation(orgId, { violations, timestamp: new Date().toISOString() });
+    // SIEM/webhook consumers get real violations only — shadow hits stay in
+    // the audit trail, they are not alerts.
+    dispatchWebhook(orgId, 'policy.violated', { violations: enforced });
+    broadcastViolation(orgId, { violations: enforced, timestamp: new Date().toISOString() });
   }
 
   res.json({ passed: !hasErrors, violations });
