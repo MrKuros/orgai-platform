@@ -20,3 +20,10 @@ docker-compose.override.yml
 *.tsbuildinfo
 dashboard/playwright-report/
 .od-skills/
+
+# local-only founder files (never publish)
+index.html
+orgai-landing-page.html.artifact.json
+todo.txt
+NAVIGATION.md
+DEPLOY.md

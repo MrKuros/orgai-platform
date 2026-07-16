@@ -1,90 +1,82 @@
-# OrgAI Platform
+# OrgAI
 
-> **Landing page:** `landing-page/index.html` — open directly in a browser
->
-> **Project code:** start at `index.html` or browse `dashboard/`, `api/`, `extension/`, `mcp/`
+**Self-hosted AI compliance enforcement for engineering teams.**
 
----
+Your developers use Claude Code, Cursor, Copilot, Windsurf. OrgAI lets the organization define coding policies once — centrally, per role — and enforces them across every AI agent, every commit, and every CI run. With an append-only audit trail of what was checked, what was blocked, and who bypassed what.
 
-Org-wide AI compliance enforcement for developer teams.
-Enforce coding policies across every AI agent your team uses — Claude Code, Cursor, Copilot, and more.
-
-## What it does
-
-- **Centralized Policy Hierarchy**: Define code standards (security, style, domain-specific rules) centrally and enforce them for every developer.
-- **Universal AI Enforcement**: The MCP server works with any MCP-compatible agent, giving you 100% coverage across IDEs and standalone agents.
-- **Audit Trail**: Real-time dashboard visibility into policy violations, fixes, and agent behavior across your whole team.
+- **Steer the agents**: an MCP server any MCP-compatible agent connects to (Claude Code, Cursor, Copilot agent mode, Windsurf) — agents check policy before writing code.
+- **Enforce at the gate**: a git pre-commit hook and CI check are the hard enforcement layer. Agent steering is advisory; the hook and CI are not.
+- **Prove it happened**: every check, violation, and bypass (`COMPLY_SKIP` is logged, not silent) lands in an append-only audit trail — evidence for SOC 2 / ISO 27001 / HIPAA / DPDP audits. Evidence, not certification.
+- **Roles that match your org**: policies attach to roles, roles inherit, and a member can hold multiple roles across departments — union of policies, strictest wins.
+- **Self-hosted**: runs in your VPC or fully air-gapped. Your code never leaves your infrastructure. Policy checks are deterministic pattern/AST rules — no LLM calls, no token spend, sub-second.
 
 ## Architecture
 
 ```text
 orgai-platform/
 ├── packages/core/   Shared policy engine + evaluator
-├── api/             REST API (Express + Prisma + PostgreSQL)
+├── api/             REST API + MCP server (Express + Prisma + PostgreSQL)
 ├── dashboard/       Web dashboard (Next.js)
-├── mcp/             MCP server (works with any MCP-compatible agent)
-└── extension/       VS Code extension
+├── mcp/             Standalone MCP CLI (orgai-comply)
+└── extension/       VS Code extension (optional, cloud-LLM based — separate from the self-hosted enforcement path)
 ```
 
-## Quick start (local dev)
+## Quick start
+
+One command — starts PostgreSQL (Docker/Podman), runs migrations, boots API + dashboard with hot reload:
 
 ```bash
 git clone https://github.com/MrKuros/orgai-platform
 cd orgai-platform
-cp .env.example .env
-# Edit .env with your values
-docker-compose up
-# API: http://localhost:8080
+./dev.sh
+# API:       http://localhost:8080
 # Dashboard: http://localhost:3000
-# MCP: http://localhost:8080/mcp/sse
+# Stop:      ./dev.sh --down
 ```
 
-## Manual setup (without Docker)
+Or with docker-compose: `cp .env.example .env && docker-compose up`.
+
+## Connect a developer
+
+One command per developer — configures their MCP clients and installs the pre-commit hook:
 
 ```bash
-# ⚠️ Always build core first — mcp/ and extension/ depend on packages/core/dist/
-cd packages/core && npm run build
-cd ../
-
-cd api && npm install && npx prisma migrate dev && npm run dev
-cd dashboard && npm install && npm run dev
+curl -fsSL https://<your-orgai-host>/setup.sh | bash -s -- --key oai_xxx --role backend-dev
 ```
 
-## Connect the VS Code extension
+Manual MCP configuration (Cursor, Claude Code, Windsurf — any MCP client):
 
-1. Install from .vsix or VS Code Marketplace (coming soon)
-2. Open onboarding, enter your OrgAI API key
-3. Policies sync automatically
-
-## Connect any MCP agent (Cursor, Claude Code, etc.)
-
-### Quick setup (recommended)
-```bash
-curl -fsSL https://api.orgai.dev/setup.sh | bash -s -- --key YOUR_API_KEY
-```
-
-### Manual configuration
 ```json
 {
   "mcpServers": {
     "orgai": {
-      "url": "https://api.orgai.dev/mcp/sse",
-      "env": {
-        "ORGAI_API_KEY": "oai_your_key_here"
-      }
+      "url": "https://<your-orgai-host>/mcp",
+      "headers": { "x-api-key": "oai_your_key_here" }
     }
   }
 }
 ```
 
-## Deploy
+For Copilot agent mode, the setup script writes `.vscode/mcp.json` automatically.
 
-- **API (includes MCP)**: Railway (see `api/railway.json`)
-- **Dashboard**: Vercel (see `dashboard/vercel.json`)
-- Set GitHub secrets: `RAILWAY_TOKEN`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `DATABASE_URL_TEST`
+See [DEVELOPER_SETUP.md](DEVELOPER_SETUP.md) for the full onboarding guide and [FEATURES.md](FEATURES.md) for the complete feature inventory.
 
-## CI/CD
+## Production deployment
 
-GitHub Actions runs on every push to main:
-- Build + test all packages
-- Deploy to Railway + Vercel on merge to main
+Self-hosted bundle — build an offline installer tarball (Docker/Podman, install scripts for Linux/Windows):
+
+```bash
+./selfhost/build-bundle.sh
+```
+
+Works fully air-gapped. See `selfhost/` for details.
+
+## CI
+
+GitHub Actions builds and tests everything on every push: API (against a real PostgreSQL), MCP, dashboard build + lint, browser e2e suite, and the VS Code extension. CI is build + test only — no deployments run from this repository.
+
+## License
+
+[MIT](LICENSE) — use it, fork it, run it inside your company.
+
+Paid deployment, policy tuning, and support: **kashish.patel@orgai.dev**
