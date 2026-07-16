@@ -1,16 +1,33 @@
+<div align="center">
+
 # OrgAI
 
 **Self-hosted AI compliance enforcement for engineering teams.**
 
-**[orgai.dev](https://orgai.dev)** — product overview and early access for companies.
+One policy source. Every AI agent. Every commit. Proven in an append-only audit trail.
 
-Your developers use Claude Code, Cursor, Copilot, Windsurf. OrgAI lets the organization define coding policies once — centrally, per role — and enforces them across every AI agent, every commit, and every CI run. With an append-only audit trail of what was checked, what was blocked, and who bypassed what.
+[![CI](https://github.com/MrKuros/orgai-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/MrKuros/orgai-platform/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-26428B.svg)](LICENSE)
+[![MCP](https://img.shields.io/badge/MCP-compatible-C8371D.svg)](#connect-a-developer)
+[![Self-hosted](https://img.shields.io/badge/self--hosted-air--gap%20ready-26428B.svg)](#production-deployment)
 
-- **Steer the agents**: an MCP server any MCP-compatible agent connects to (Claude Code, Cursor, Copilot agent mode, Windsurf) — agents check policy before writing code.
-- **Enforce at the gate**: a git pre-commit hook and CI check are the hard enforcement layer. Agent steering is advisory; the hook and CI are not.
-- **Prove it happened**: every check, violation, and bypass (`COMPLY_SKIP` is logged, not silent) lands in an append-only audit trail — evidence for SOC 2 / ISO 27001 / HIPAA / DPDP audits. Evidence, not certification.
-- **Roles that match your org**: policies attach to roles, roles inherit, and a member can hold multiple roles across departments — union of policies, strictest wins.
-- **Self-hosted**: runs in your VPC or fully air-gapped. Your code never leaves your infrastructure. Policy checks are deterministic pattern/AST rules — no LLM calls, no token spend, sub-second.
+[**orgai.dev**](https://orgai.dev) · [Quick start](#quick-start) · [Features](FEATURES.md) · [Developer setup](DEVELOPER_SETUP.md) · [Contact](mailto:kashish.patel@orgai.dev)
+
+</div>
+
+---
+
+Your developers use Claude Code, Cursor, Copilot, Windsurf. OrgAI lets the organization define coding policies once — centrally, per role — and enforces them across every AI agent, every commit, and every CI run.
+
+|  | Layer | How | Guarantee |
+|---|---|---|---|
+| ① | **Agent steering** | MCP server any MCP-compatible agent connects to | Agents check policy *before* writing code — violations caught at the source |
+| ② | **Commit gate** | Git pre-commit hook | Violating commits blocked. Bypass (`COMPLY_SKIP`) is logged, never silent |
+| ③ | **Build gate** | CI check | Final backstop — violating builds fail |
+
+Every check, violation, and bypass lands in an **append-only audit trail** — evidence for SOC 2 / ISO 27001 / HIPAA / DPDP audits. Evidence, not certification.
+
+**Why it's fast and free to run:** policy checks are deterministic pattern/AST rules — no LLM calls, no token spend, sub-second. **Why it's private:** runs in your VPC or fully air-gapped; your code never leaves your infrastructure.
 
 ## Where it sits
 
@@ -48,7 +65,11 @@ flowchart LR
 ```
 
 **①** Agent asks OrgAI what the developer's role allows *before* generating code — advisory steering, catches violations at the source.
-**②③** Git hook and CI re-check deterministically — the hard enforcement. An agent (or human) that ignores steering gets blocked at commit and again at build. Every check and every bypass lands in the audit trail.
+**②③** Git hook and CI re-check deterministically — the hard enforcement. An agent (or human) that ignores steering gets blocked at commit and again at build.
+
+## Roles that match your org
+
+Policies attach to roles, roles inherit, and a member can hold **multiple roles across departments** — they get the union of all their policies, strictest wins. A payments engineer who also touches the data platform inherits both rulebooks automatically.
 
 ## Architecture
 
@@ -115,8 +136,13 @@ Works fully air-gapped. See `selfhost/` for details.
 
 GitHub Actions builds and tests everything on every push: API (against a real PostgreSQL), MCP, dashboard build + lint, browser e2e suite, and the VS Code extension. CI is build + test only — no deployments run from this repository.
 
-## License
+---
 
-[MIT](LICENSE) — use it, fork it, run it inside your company.
+<div align="center">
 
-Running this in your company? Paid deployment, policy tuning, and support: **kashish.patel@orgai.dev** · [orgai.dev](https://orgai.dev)
+**[MIT licensed](LICENSE)** — use it, fork it, run it inside your company.
+
+Running this in your company? Paid deployment, policy tuning, and support:
+[**kashish.patel@orgai.dev**](mailto:kashish.patel@orgai.dev) · [**orgai.dev**](https://orgai.dev)
+
+</div>
